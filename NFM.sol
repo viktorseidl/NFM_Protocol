@@ -239,6 +239,10 @@ contract NFM {
      //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     mapping(address => uint256) public _balances;
     mapping(address => mapping(address => uint256)) public _allowances;
+    mapping(address => uint256) private _addressIssueTracker;
+    mapping(address => uint256) private _lastBalanceStamp;
+    mapping(address => uint256) private _lastBalanceAmount;
+    mapping(address => bool) private _BonusAllowance;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     CONTRACT EVENTS
@@ -373,6 +377,20 @@ contract NFM {
     }
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
+    @bonusCheck(address account) returns (uint256, uint256, bool);
+    Special Function for Bonus Extension
+     */
+     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function bonusCheck(address account) public view returns (uint256, uint256,uint256,bool) {
+        require(
+            _Controller._checkWLSC(_SController, msg.sender) == true ||
+                msg.sender == _Owner,
+            "oO"
+        );
+        return (_addressIssueTracker[account], _lastBalanceStamp[account], _lastBalanceAmount[account], _BonusAllowance[account]);
+    }
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
     @allowance(address owner, address spender) returns (uint256);
     Strandard ERC20 Function
      */
@@ -480,6 +498,38 @@ contract NFM {
         } else {
             //--------------------------------------------------------------------------------------------
             /**
+            SPECIAL TRACKING FOR BONUS PAYMENTS.
+            Newly created accounts are excluded from the bonus event.
+            The account balance from 24 hours ago is taken as admission. This prevents manipulations. 
+            If the previous account balance was less than 250 NFM in the last 24 hours before Bonus Event, there is a possibility of manipulation 
+            if it happens within the time window.
+            An example would be: A participant has several accounts and switches his NFM between the accounts 
+            in order to collect twice.
+            */
+            //--------------------------------------------------------------------------------------------
+            if(_addressIssueTracker[to] > 0){
+                if(_lastBalanceStamp[to] < block.timestamp){
+                    if( INfmTimer(address(_Controller._getTimer()))._getExtraBonusAllTime()<_lastBalanceStamp[to]+(3600*24) 
+                        && _lastBalanceStamp[to] < INfmTimer(address(_Controller._getTimer()))._getEndExtraBonusAllTime()){
+
+                        }else{
+                            _lastBalanceStamp[to]=block.timestamp+(3600*24);
+                            if(_lastBalanceAmount[to] < 250*10**18){
+                                _BonusAllowance[to]=false;
+                            }else{
+                                _BonusAllowance[to]=true;
+                            }
+                            _lastBalanceAmount[to]=amount+_balances[to];
+                        }                    
+                }
+            }else{
+                _addressIssueTracker[to]=block.timestamp;
+                _lastBalanceStamp[to]=block.timestamp+(3600*24);
+                _lastBalanceAmount[to]=amount; 
+                _BonusAllowance[to]=true;
+            }
+            //--------------------------------------------------------------------------------------------
+            /**
             IF ADDRESS IS NOT WHITELISTED 
             LOGIC MUST BE APPLIED
              */
@@ -582,7 +632,9 @@ contract NFM {
                 if (
                     tlocker == false &&
                     block.timestamp >= Timer._getExtraBonusAllTime() &&
-                    (_balances[from] - amount) >= 150 * 10**18
+                    (_balances[from] - amount) >= 250 * 10**18
+                    && _addressIssueTracker[to] < Timer._getExtraBonusAllTime()
+                    && _BonusAllowance[to]==true
                 ) {
                     if (block.timestamp >= Timer._getEndExtraBonusAllTime()) {
                         (address IBonus, ) = _Controller._getBonusBuyBack();
