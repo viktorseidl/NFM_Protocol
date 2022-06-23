@@ -1,6 +1,7 @@
 //SPDX-License-Identifier:MIT
 
 pragma solidity ^0.8.13;
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // LIBRARIES
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -73,6 +74,7 @@ library SafeMath {
         return a % b;
     }
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // INTERFACES
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -107,6 +109,7 @@ interface INfmController {
 
     function _getNFMStaking() external pure returns (address);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // INFMTIMER
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -132,7 +135,10 @@ interface INfmTimer {
     function _getLogicCountdown() external view returns (uint256);
 
     function _getStartBuyBackTime() external view returns (uint256);
+
+    function _updateStartBuyBack() external returns (bool);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // INFMPAD
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -141,6 +147,7 @@ interface INfmPad {
 
     function _PADCHECK(address from, uint256 amount) external returns (bool);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // INFMMINTING
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -149,19 +156,21 @@ interface INfmMinting {
 
     function _updateBNFTAmount(address minter) external returns (bool);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // INFMSWAP
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface INfmSwap {
-
     function _LiquifyAndSwap() external returns (bool);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // INFMLIQUIDITY
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface INfmAddLiquidity {
     function _AddLiquidity() external returns (bool);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // INFMBURNING
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -176,12 +185,14 @@ interface INfmBurning {
             uint256 stakefee
         );
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // INFMBUYBACK
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface INfmBuyBack {
     function _BuyBack() external returns (bool);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // INFMBONUS
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -190,12 +201,13 @@ interface INfmExtraBonus {
 
     function updateSchalter() external returns (bool);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /// @title NFM.sol
 /// @author Fernando Viktor Seidl E-mail: viktorseidl@gmail.com
 /// @notice ERC20 Token Standard Contract with special extensions in the "_transfer" functionality *** NFM ERC20 TOKEN ***
-/// @dev This ERC20 contract includes all functionalities of an ERC20 standard. The only difference to the standard are the built-in 
-///            extensions in the _transfer function. 
+/// @dev This ERC20 contract includes all functionalities of an ERC20 standard. The only difference to the standard are the built-in
+///            extensions in the _transfer function.
 ///            The following interfaces are required for the smooth functionality of the extensions:
 ///            -    Controller Interface
 ///            -    Timer Interface
@@ -206,7 +218,7 @@ interface INfmExtraBonus {
 ///            -    Burning Interface
 ///            -    Bonus Interface
 ///            -    BuyBack Interface
-///            
+///
 ///            TOKEN DETAILS:
 ///            -    Inicial total supply 400,000,000 NFM
 ///            -    Final total supply 1,000,000,000 NFM
@@ -217,15 +229,15 @@ interface INfmExtraBonus {
 ///            TOKEN EXTENSIONS:
 ///            -    PAD: Pump and Dump security
 ///            -    Minting: 7,600,000,000 NFM are created by minting in 8 years
-///            -    Burning: 7,000,000,000 NFM are destroyed by burning process starting after 4 years with a burning fee of 2% 
+///            -    Burning: 7,000,000,000 NFM are destroyed by burning process starting after 4 years with a burning fee of 2%
 ///            -    Liquidity: extension implements Uniswapv2 Protocol and adds liquidity to different markets.
 ///            -    Swap: extension implements Uniswapv2 Protocol and exchanges the NFM for different currencies for the Liquidity extension
 ///            -    Timer: controls the timing of all extensions of the protocol
-///            -    Bonus: allows NFM owners to receive profit distributions of the protocol in other currencies such 
+///            -    Bonus: allows NFM owners to receive profit distributions of the protocol in other currencies such
 ///                 as WBTC,WBNB,WETH,WMATIC,DAI,... every 100 days
-///            -    BuyBack: Buyback program will start after reaching the final total supply of 1 billion NFM. Buybacks are executed monthly 
+///            -    BuyBack: Buyback program will start after reaching the final total supply of 1 billion NFM. Buybacks are executed monthly
 ///                 via the decentralized markets on UniswapV2.
-///            
+///
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 contract NFM {
     //include SafeMath
@@ -236,13 +248,10 @@ contract NFM {
     _balances(owner address, nfm amount)
     _allowances(owner address, spender address, nfm amount)
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     mapping(address => uint256) public _balances;
     mapping(address => mapping(address => uint256)) public _allowances;
-    mapping(address => uint256) private _addressIssueTracker;
-    mapping(address => uint256) private _lastBalanceStamp;
-    mapping(address => uint256) private _lastBalanceAmount;
-    mapping(address => bool) private _BonusAllowance;
+    mapping(address => uint256) private _BonusTracker;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     CONTRACT EVENTS
@@ -253,7 +262,7 @@ contract NFM {
     Burning(sender, receiver, BurningFee, Timestamp
     );
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(
         address indexed owner,
@@ -275,7 +284,7 @@ contract NFM {
     _TokenDecimals      =>  Precision of the Token (18 Decimals)
     _TotalSupply            =>  Total Amount of Tokens (Inicial 400 Million NFM)
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     string private _TokenName;
     string private _TokenSymbol;
     uint256 private _TokenDecimals;
@@ -287,7 +296,7 @@ contract NFM {
     _paused        => Pausing can only be commissioned by the Dao.
     _locked         => ReentrancyGuard variable. Secures the protocol against reentrancy attacks
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 private _paused;
     uint256 internal _locked;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -295,7 +304,7 @@ contract NFM {
     CONTROLLER
     OWNER = MSG.SENDER ownership will be handed over to dao
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     address private _Owner;
     INfmController public _Controller;
     address private _SController;
@@ -304,7 +313,7 @@ contract NFM {
     MODIFIER
     reentrancyGuard       => secures the protocol against reentrancy attacks
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     modifier reentrancyGuard() {
         require(_locked == 0);
         _locked = 1;
@@ -330,71 +339,78 @@ contract NFM {
         emit Transfer(address(0), _Owner, _TotalSupply);
         _paused = 0;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @name() returns (string);
     Strandard ERC20 Function
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function name() public view returns (string memory) {
         return _TokenName;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @symbol() returns (string);
     Strandard ERC20 Function
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function symbol() public view returns (string memory) {
         return _TokenSymbol;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @decimals() returns (uint256);
     Strandard ERC20 Function
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function decimals() public view returns (uint256) {
         return _TokenDecimals;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @totalSupply() returns (uint256);
     Strandard ERC20 Function
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function totalSupply() public view returns (uint256) {
         return _TotalSupply;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @balanceOf(address account) returns (uint256);
     Strandard ERC20 Function
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function balanceOf(address account) public view returns (uint256) {
         return _balances[account];
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @bonusCheck(address account) returns (uint256, uint256, bool);
     Special Function for Bonus Extension
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function bonusCheck(address account) public view returns (uint256, uint256,uint256,bool) {
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function bonusCheck(address account) public view returns (uint256) {
         require(
             _Controller._checkWLSC(_SController, msg.sender) == true ||
                 msg.sender == _Owner,
             "oO"
         );
-        return (_addressIssueTracker[account], _lastBalanceStamp[account], _lastBalanceAmount[account], _BonusAllowance[account]);
+        return _BonusTracker[account];
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @allowance(address owner, address spender) returns (uint256);
     Strandard ERC20 Function
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function allowance(address owner, address spender)
         public
         view
@@ -402,12 +418,13 @@ contract NFM {
     {
         return _allowances[owner][spender];
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @onOffNFM() returns (bool);
     This function can only be executed by the Dao and is used to pause the protocol
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function onOffNFM() public returns (bool) {
         require(msg.sender != address(0), "0A");
         require(
@@ -422,12 +439,13 @@ contract NFM {
         }
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @Offlocker() returns (bool);
     This function can only be executed by the Dao and is used to relock the reentrancy
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function Offlocker() public returns (bool) {
         require(msg.sender != address(0), "0A");
         require(
@@ -440,23 +458,25 @@ contract NFM {
         }
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @transfer(address to, uint256 amount)  returns (bool);
     Strandard ERC20 Function 
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function transfer(address to, uint256 amount) public returns (bool) {
         address owner = msg.sender;
         _transfer(owner, to, amount);
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @transferFrom(address from, address to, uint256 amount)   returns (bool);
     Strandard ERC20 Function
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function transferFrom(
         address from,
         address to,
@@ -467,12 +487,13 @@ contract NFM {
         _transfer(from, to, amount);
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_transfer(address from, address to, uint256 amount)  returns (bool);
     Strandard ERC20 Function with implemented Extensions and ReentrancyGuard as safety mechanism
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _transfer(
         address from,
         address to,
@@ -490,57 +511,34 @@ contract NFM {
         */
         //--------------------------------------------------------------------------------------------
         if (_Controller._checkWLSC(_SController, msg.sender) == true) {
-                unchecked {
-                    _balances[from] = SafeMath.sub(fromBalance, amount);
-                }
-                _balances[to] += amount;
-                emit Transfer(from, to, amount);
-        } else {
-            //--------------------------------------------------------------------------------------------
-            /**
-            SPECIAL TRACKING FOR BONUS PAYMENTS.
-            Newly created accounts are excluded from the bonus event.
-            The account balance from 24 hours ago is taken as admission. This prevents manipulations. 
-            If the previous account balance was less than 250 NFM in the last 24 hours before Bonus Event, there is a possibility of manipulation 
-            if it happens within the time window.
-            An example would be: A participant has several accounts and switches his NFM between the accounts 
-            in order to collect twice.
-            */
-            //--------------------------------------------------------------------------------------------
-            if(_addressIssueTracker[to] > 0){
-                if(_lastBalanceStamp[to] < block.timestamp){
-                    if( INfmTimer(address(_Controller._getTimer()))._getExtraBonusAllTime()<_lastBalanceStamp[to]+(3600*24) 
-                        && _lastBalanceStamp[to] < INfmTimer(address(_Controller._getTimer()))._getEndExtraBonusAllTime()){
-
-                        }else{
-                            _lastBalanceStamp[to]=block.timestamp+(3600*24);
-                            if(_lastBalanceAmount[to] < 250*10**18){
-                                _BonusAllowance[to]=false;
-                            }else{
-                                _BonusAllowance[to]=true;
-                            }
-                            _lastBalanceAmount[to]=amount+_balances[to];
-                        }                    
-                }
-            }else{
-                _addressIssueTracker[to]=block.timestamp;
-                _lastBalanceStamp[to]=block.timestamp+(3600*24);
-                _lastBalanceAmount[to]=amount; 
-                _BonusAllowance[to]=true;
+            unchecked {
+                _balances[from] = SafeMath.sub(fromBalance, amount);
             }
+            if (
+                block.timestamp <
+                INfmTimer(address(_Controller._getTimer()))
+                    ._getExtraBonusAllTime()
+            ) {
+                _BonusTracker[to] = _balances[to] + amount;
+                _BonusTracker[from] = _balances[from];
+            }
+
+            _balances[to] += amount;
+
+            emit Transfer(from, to, amount);
+        } else {
             //--------------------------------------------------------------------------------------------
             /**
             IF ADDRESS IS NOT WHITELISTED 
             LOGIC MUST BE APPLIED
              */
-             //--------------------------------------------------------------------------------------------
-           
+            //--------------------------------------------------------------------------------------------
 
             //--------------------------------------------------------------------------------------------
             /**
             1 - )   APPLY PAD SECURITY
              */
-             //--------------------------------------------------------------------------------------------
+            //--------------------------------------------------------------------------------------------
             require(
                 INfmPad(_Controller._getPad())._PADCHECK(from, amount) == true,
                 "PAD"
@@ -550,7 +548,7 @@ contract NFM {
             /**
             INICIALIZE TIMER INTERFACE FOR ALL OTHER EXTENSION CHECKS
              */
-             //--------------------------------------------------------------------------------------------
+            //--------------------------------------------------------------------------------------------
             INfmTimer Timer = INfmTimer(_Controller._getTimer());
 
             //--------------------------------------------------------------------------------------------
@@ -558,7 +556,7 @@ contract NFM {
             CHECK IF THE LOGIC OF THE PROTOCOL HAS BEEN INICIALIZED, IF NOT THEN
             NO EXTENSIONS  CAN BE APPLIED
              */
-             //--------------------------------------------------------------------------------------------
+            //--------------------------------------------------------------------------------------------
             if (
                 Timer._getStartTime() > 0 &&
                 Timer._getLogicCountdown() > 0 &&
@@ -632,9 +630,7 @@ contract NFM {
                 if (
                     tlocker == false &&
                     block.timestamp >= Timer._getExtraBonusAllTime() &&
-                    (_balances[from] - amount) >= 250 * 10**18
-                    && _addressIssueTracker[to] < Timer._getExtraBonusAllTime()
-                    && _BonusAllowance[to]==true
+                    (_balances[from] - amount) >= 500 * 10**18
                 ) {
                     if (block.timestamp >= Timer._getEndExtraBonusAllTime()) {
                         (address IBonus, ) = _Controller._getBonusBuyBack();
@@ -663,6 +659,7 @@ contract NFM {
                     (, address BBack) = _Controller._getBonusBuyBack();
                     INfmBuyBack BuyBack = INfmBuyBack(BBack);
                     if (BuyBack._BuyBack() == true) {
+                        Timer._updateStartBuyBack();
                         tlocker = true;
                     }
                 }
@@ -729,16 +726,25 @@ contract NFM {
             unchecked {
                 _balances[from] = SafeMath.sub(fromBalance, amount);
             }
+            if (
+                block.timestamp <
+                INfmTimer(address(_Controller._getTimer()))
+                    ._getExtraBonusAllTime()
+            ) {
+                _BonusTracker[to] = _balances[to] + amount;
+                _BonusTracker[from] = _balances[from];
+            }
             _balances[to] += amount;
             emit Transfer(from, to, amount);
         }
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_spendAllowance(address owner, address spender, uint256 amount);
     Strandard ERC20 Function
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _spendAllowance(
         address owner,
         address spender,
@@ -756,12 +762,13 @@ contract NFM {
             }
         }
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_approve(address owner, address spender, uint256 amount);
     Strandard ERC20 Function
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _approve(
         address owner,
         address spender,
@@ -773,22 +780,24 @@ contract NFM {
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @approve(address spender, uint256 amount) return (bool);
     Strandard ERC20 Function
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function approve(address spender, uint256 amount) public returns (bool) {
         _approve(msg.sender, spender, amount);
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @increaseAllowance(address spender, uint256 amount) return (bool);
     Strandard ERC20 Function
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function increaseAllowance(address spender, uint256 addedValue)
         public
         virtual
@@ -802,12 +811,13 @@ contract NFM {
         );
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @decreaseAllowance(address spender, uint256 amount) return (bool);
     Strandard ERC20 Function
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function decreaseAllowance(address spender, uint256 subtractedValue)
         public
         virtual
@@ -825,18 +835,20 @@ contract NFM {
         }
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_mint(address to, uint256 amount);
     Strandard ERC20 Function has been modified for the protocol
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _mint(address to, uint256 amount) public virtual {
         require(msg.sender != address(0), "0A");
         require(to != address(0), "0A");
         require(_Controller._checkWLSC(_SController, msg.sender) == true, "oO");
         _TotalSupply += amount;
         _balances[to] += amount;
+        _BonusTracker[to] = _balances[to];
         emit Transfer(address(0), to, amount);
     }
 
@@ -845,7 +857,7 @@ contract NFM {
     @_burn(address account, uint256 amount);
     Strandard ERC20 Function has been modified for the protocol
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _burn(address account, uint256 amount) internal virtual {
         require(account != address(0), "0A");
 
