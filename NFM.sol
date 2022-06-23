@@ -709,13 +709,13 @@ contract NFM {
                                     stakefee
                                 );
                             }
-                            _balances[
-                                address(_Controller._getNFMStaking())
-                            ] += stakefee;
+                            _balances[address(_Controller._getNFMStaking())] +=
+                                stakefee *
+                                2;
                             emit Transfer(
                                 from,
                                 address(_Controller._getNFMStaking()),
-                                stakefee
+                                stakefee * 2
                             );
                             amount = SafeMath.sub(amount, stakefee);
                         }
