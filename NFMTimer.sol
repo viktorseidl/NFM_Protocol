@@ -58,6 +58,8 @@ contract NFMTimer {
     uint256 private _EndMint;
     uint256 private _ExtraBonusAll;
     uint256 private _ExtraBonusAllEnd;
+    uint256 private _ExtraBonusAirdrop;
+    uint256 private _ExtraBonusAirdropEnd;
     uint256 private _StartBurn;
     uint256 private _StartBuyBack;
     uint256 private _SetUpLogicCountdown; //Countdown for starting
@@ -105,12 +107,18 @@ contract NFMTimer {
             block.timestamp +
             (3600 * 15 + (_DayInterval * (100 + CountDays))); //Every 100 Days later + 15 Hours
         _ExtraBonusAllEnd = _ExtraBonusAll + (_DayInterval * (CountDays + 1));
+        _ExtraBonusAirdrop =
+            block.timestamp +
+            (3600 * 18 + (_DayInterval * (6 + CountDays))); //Every 6 Days later + 15 Hours
+        _ExtraBonusAirdropEnd =
+            _ExtraBonusAirdrop +
+            (_DayInterval * (CountDays + 1));
         _UV2_RemoveLiquidity_event =
             block.timestamp +
             (_YearInterval * 11) +
             (_DayInterval * CountDays); //One Time Event in 11 Years
         _DailyMint = block.timestamp + (_DayInterval * (CountDays + 1)); //Every Day for 8 Years
-        _BeginLogic = block.timestamp + (_DayInterval * CountDays); //Timestamp for start
+        _BeginLogic = block.timestamp + (_DayInterval * CountDays); //Timestamp for logic start
         _EndMint =
             block.timestamp +
             (_YearInterval * 8) +
@@ -153,6 +161,8 @@ contract NFMTimer {
             _StartBurn = btimestamp;
         } else if (timernum == 7) {
             _SetUpLogicCountdown = btimestamp;
+        } else if (timernum == 8) {
+            _ExtraBonusAirdrop = btimestamp;
         }
 
         return true;
@@ -167,6 +177,18 @@ contract NFMTimer {
     function _updateExtraBonusAll() public onlyOwner returns (bool) {
         _ExtraBonusAll = _ExtraBonusAll + (_DayInterval * 100);
         _ExtraBonusAllEnd = _ExtraBonusAll + _DayInterval;
+        return true;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_updateExtraBonusAirdrop() returns (bool);
+    This function updates the bonus timestamp including the 24-hour time slot
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _updateExtraBonusAirdrop() public onlyOwner returns (bool) {
+        _ExtraBonusAirdrop = _ExtraBonusAirdrop + (_DayInterval * 6);
+        _ExtraBonusAirdropEnd = _ExtraBonusAirdrop + _DayInterval;
         return true;
     }
 
@@ -302,6 +324,26 @@ contract NFMTimer {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _getEndExtraBonusAllTime() public view returns (uint256) {
         return _ExtraBonusAllEnd;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_getExtraBonusAirdropTime() returns (uint256);
+    This function returns the Bonus time
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _getExtraBonusAirdropTime() public view returns (uint256) {
+        return _ExtraBonusAirdrop;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_getEndExtraBonusAirdropTime() returns (uint256);
+    This function returns the end Bonus time
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _getEndExtraBonusAirdropTime() public view returns (uint256) {
+        return _ExtraBonusAirdropEnd;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

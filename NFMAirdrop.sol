@@ -98,9 +98,9 @@ interface INfmController {
 // INFMTIMER
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface INfmTimer {
-    function _getAirdropTime() external view returns (uint256);
+    function _getExtraBonusAirdropTime() external view returns (uint256);
 
-    function _getEndAirdropTime() external view returns (uint256);
+    function _getEndExtraBonusAirdropTime() external view returns (uint256);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -151,13 +151,13 @@ interface INFM {
 /// @dev This extension regulates a special payout from different currencies of the Launchpad to the community every 5 days.
 ///
 ///         INFO:
-///         -   Every 5 days, profit distributions are made available to this protocol in various currencies by the IDO Launchpad
-///             in different currencies.
-///         -   As soon as the amounts are available, a amount per NFM will be calculated. The calculation is as follows:
+///         -   Every 6 days, profit distributions are made available to this protocol in various currencies by the IDO Launchpad
+///             in different currencies, also non IDO Tokens can be made available.
+///         -   As soon as the amounts are available, a amount per NFM will be calculated by the protocol. The calculation is as follows:
 ///             Amount available for distribution / NFM total supply = X
 ///         -   The distribution happens automatically during the transaction. As soon as an NFM owner makes a transfer within the bonus window,
 ///             the bonus will automatically be calculated on his NFM balance and credited to his account. The NFM owner is informed about upcoming
-///             special payments via the homepage. A prerequisite for participation in the bonus payments is a minimum balance of 50 NFM on the
+///             special payments via the homepage. A prerequisite for participation in the bonus payments is a minimum balance of 150 NFM on the
 ///             participant's account.
 ///         -   The payout window is set to 24 hours. Every NFM owner who makes a transfer within this period will automatically have his share
 ///             credited to his account. All remaining amounts will be partially credited to the staking pool after the end of the time window,
@@ -181,39 +181,53 @@ contract NFMAirdrop {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     uint256 allCoinsCounter        => Counts all registered airdrops 
-    uint256 lastRoundCounter     => Indicates which index was last paid out.
-    uint256 Schalter                    => regulates the execution of the one time calculations for the airdrop
+    uint256 lastRoundCounter     => Contains the initial index or the starting index during the event
+    uint256 nextRoundCounter    => Contains the last index reached, or the final index within the event
+    uint256 Schalter                     => Regulates the execution of the one time calculations for the coming airdrop
+    address[] AirdropCoins          => Contains all token addresses of the approved airdrops
+    struct Airdrop                          => Contains important information for checking non-ido airdrops
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 public allCoinsCounter = 0;
     uint256 public lastRoundCounter = 0;
+    uint256 public nextRoundCounter = 0;
     uint256 private Schalter = 0;
+    address[] private AirdropCoins;
+    struct Airdrop {
+        string Webpage;
+        string Description;
+        string Logo;
+    }
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     MAPPINGS
     _wasPaidCheck (Owner address, ending Timestamp of Airdrop);         //Records when payments have been made
     _totalBalCoin (ERC20 address => Total amount of Airdrop);                 //Records the balance of the airdrop
-    _CoinWLDao (Costumer address => mapping(ERC20 address => true 
+    _CoinWLDao (ERC20 address => true 
     if accepted false if denied));                                                                  //Records whether the coin has been approved
+    _AirdropInfo (ERC20 address => Struct Info about the Token);            //Records information about the Project to be reviewed.
+    _WLRegistry (Owner => ERC20 address);                                           //Records the Airdrop Owner of a non-IDO;
     _CoinforNFM (ERC20 address => Amount per NFM);                          //Shows how many coins are paid out per NFM
     _CoinAvailable (ERC20 address => true if funds available false 
     if already done);                                                                                     //Records whether credit is still available
-    _allIdoCoins (CoinCounterNum => ERC20 address);                           //Records the coin register
+    _allIdoCoins (CoinCounterNum => ERC20 address);                           //Records the coin index register
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     mapping(address => uint256) private _wasPaidCheck;
     mapping(address => uint256) private _totalBalCoin;
-    mapping(address => mapping(address => bool)) private _CoinWLDao;
+    mapping(address => bool) private _CoinWLDao;
+    mapping(address => Airdrop) private _AirdropInfo;
+    mapping(address => address) private _WLRegistry;
     mapping(address => uint256) private _CoinforNFM;
     mapping(address => bool) private _CoinAvailable;
     mapping(uint256 => address) private _allIdoCoins;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     CONTRACT EVENTS
-    EBonus(address receiver, address Coin, uint256 amount, uint256 timer);
+    Airdrops(address receiver, address Coin, uint256 amount, uint256 timer);
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    event Airdrop(
+    event Airdrops(
         address indexed receiver,
         address indexed Coin,
         uint256 amount,
@@ -244,24 +258,130 @@ contract NFMAirdrop {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    @_requestWLAirdrop(address Coin) returns (bool);
-    This function registers the listing. In the case of a non-IDO, the listing will only be approved after the Dao members 
-    have checked and approved it.
+    @_checkPayment(address sender) returns (uint256);
+    This function returns the timestamp of the address. If the timestamp is set to the end of the event, then the sender has 
+    already received their airdrop.
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _requestWLAirdrop(address Coin) public returns (bool) {
-        if (_Controller._checkWLSC(_SController, msg.sender) == true) {
-            _CoinWLDao[msg.sender][Coin] = true;
-        } else {
-            _CoinWLDao[msg.sender][Coin] = false;
-        }
+    function _checkPayment(address sender) public view returns (uint256) {
+        return _wasPaidCheck[sender];
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_showAirdropToken() returns (address);
+    This function returns the Token address of an airdrop.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _showAirdropToken() public view returns (address) {
+        return _WLRegistry[msg.sender];
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_showAirdropStatus() returns (bool);
+    This function returns the whitelisting status of an airdrop on token Address.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _showAirdropStatus(address Coin) public view returns (bool) {
+        return _CoinWLDao[Coin];
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_showUpComingAirdrops() returns (uint256);
+    This function gives the index number of the last airdrops paid out. This allows upcoming airdrops to be displayed.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _showUpComingAirdrops() public view returns (uint256) {
+        return nextRoundCounter;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_showAirdropArray() returns (addresses Array);
+    This function returns the all successful airdrop token addresses.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _showAirdropArray() public view returns (address[] memory Arr) {
+        return AirdropCoins;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_showAirdropInfo(address Coin) returns (Struct);
+    This function returns the all Information about a provided non IDO airdrop.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _showAirdropInfo(address Coin)
+        public
+        view
+        returns (Airdrop memory)
+    {
+        return _AirdropInfo[Coin];
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_confirmPayment(address receiver) returns (bool);
+    This function returns the timestamp of the address. If the timestamp is set to the end of the event, then the sender has 
+    already received their airdrop.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _confirmPayment(address receiver) public onlyOwner returns (bool) {
+        _wasPaidCheck[receiver] = INfmTimer(_Controller._getTimer())
+            ._getEndExtraBonusAirdropTime();
         return true;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_confirmWL(address Coin) returns (bool);
+    This function This function is responsible for whitelisting the registered airdrops. All non-IDO airdrops need to be 
+    pre-checked against fraud
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _confirmWL(address Coin) public onlyOwner returns (bool) {
+        _CoinWLDao[Coin] = true;
+        return true;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_requestWLAirdrop(address Coin) returns (bool);
+    This function registers the listing. In the case of a non-IDO, the listing will only be approved after the Dao members 
+    have checked and approved it. Important: Only Coins with minimum 6 decimals are allowed for listing
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _requestWLAirdrop(
+        address Coin,
+        string memory Website,
+        string memory Tokendescription,
+        string memory Tokenlogo
+    ) public returns (bool) {
+        if (IERC20(address(Coin)).decimals() == 0) {
+            return false;
+        } else {
+            if (_Controller._checkWLSC(_SController, msg.sender) == true) {
+                _CoinWLDao[Coin] = true;
+            } else {
+                _CoinWLDao[Coin] = false;
+                _WLRegistry[msg.sender] = Coin;
+                _AirdropInfo[Coin] = Airdrop(
+                    Website,
+                    Tokendescription,
+                    Tokenlogo
+                );
+            }
+            return true;
+        }
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_approveDeposit(address Coin, uint256 Amount) returns (bool);
     This function authorizes the delivery of tokens for the airdrop. The minimum amount for an airdrop is 1000 tokens
+    For the execution of the function, the owner must have approved the amount in advance.
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _approveDeposit(address Coin, uint256 Amount)
@@ -269,7 +389,7 @@ contract NFMAirdrop {
         returns (bool)
     {
         if (
-            _CoinWLDao[msg.sender][Coin] == true &&
+            _CoinWLDao[Coin] == true &&
             IERC20(address(Coin)).allowance(msg.sender, address(this)) ==
             Amount &&
             IERC20(address(Coin)).allowance(msg.sender, address(this)) >=
@@ -294,19 +414,24 @@ contract NFMAirdrop {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_addAirDrop(address Coin, uint256 Amount) returns (bool);
-    This feature saves all important data for the airdrop. In order for the airdrop to take place, a non-IDO airdrop must 
-    have the approval of the Dao.
+    This function finally saves all important data for the airdrop. In order for the airdrop to take place, a non-IDO airdrop must 
+    have the pre-approval of the Dao. 
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _addAirDrop(address Coin) public onlyOwner returns (bool) {
         if (
-            _CoinWLDao[msg.sender][Coin] == true &&
+            _CoinWLDao[Coin] == true &&
             IERC20(address(Coin)).balanceOf(address(this)) > 0
         ) {
             _totalBalCoin[Coin] = IERC20(address(Coin)).balanceOf(
                 address(this)
             );
-            _CoinAvailable[Coin] = true;
+            if (_CoinAvailable[Coin] == false) {
+                _CoinAvailable[Coin] = true;
+            } else {
+                _CoinAvailable[Coin] = true;
+                AirdropCoins.push(Coin);
+            }
             _allIdoCoins[allCoinsCounter] = Coin;
             allCoinsCounter++;
             return true;
@@ -316,67 +441,37 @@ contract NFMAirdrop {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    @_checkSwapCounter() returns (bool);
-    This function checks the array index to use
+    @makeCalc(address Coin) returns (bool);
+    This function is executed at the beginning of an Airdrop event. It calculates the bonus amount 
+    that is paid out for 1 NFM
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _updateAirdropArray() public onlyOwner returns (bool) {
-        if (allCoinsCounter >= lastRoundCounter + 3) {
-            //No problem just check Coin propiety
-        } else {
-            //allCoinsCounter - lastRoundCounter
+    function makeCalc(address Coin) internal virtual returns (bool) {
+        if (_totalBalCoin[Coin] > 0 && _CoinAvailable[Coin] == true) {
+            //Get actual TotalSupply NFM
+            uint256 NFMTotalSupply = IERC20(address(_Controller._getNFM()))
+                .totalSupply();
+            //Get full Amount of Coin
+            uint256 CoinTotal = IERC20(address(Coin)).balanceOf(address(this));
+            //Get Coindecimals for calculations
+            uint256 CoinDecimals = IERC20(address(Coin)).decimals();
+            if (CoinDecimals < 18) {
+                //if smaller than 18 Digits, convert to 18 digits
+                CoinTotal = CoinTotal * 10**(18 - CoinDecimals);
+            }
+            //Calculate how much Coin will receive each NFM.
+            uint256 CoinvsNFM = SafeMath.div(
+                SafeMath.mul(CoinTotal, 10**18),
+                NFMTotalSupply
+            );
+            if (CoinDecimals < 18) {
+                //If coin decimals not equal to 18, return to coin decimals
+                CoinvsNFM = SafeMath.div(CoinvsNFM, 10**(18 - CoinDecimals));
+            }
+            _CoinforNFM[Coin] = CoinvsNFM;
+            return true;
         }
-        return true;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @_checkOnNewPairs() returns (bool);
-    This function checks whether new currencies have been implemented for the bonus system
-     */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _checkOnNewPairs() public onlyOwner returns (bool) {
-        uint256 Coins = INfmUV2Pool(address(_Controller._getUV2Pool()))
-            ._showPairNum();
-        if (Coins > _CoinArrLength) {
-            _CoinArrLength = Coins;
-            _CoinsArray = INfmUV2Pool(address(_Controller._getUV2Pool()))
-                ._returnCoinsArray();
-        }
-        return true;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @makeCalc() returns (bool);
-    This function is executed once at the beginning of an event. It calculates the bonus amount that is paid out for 1 NFM
-     */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function makeCalc() public virtual onlyOwner returns (bool) {
-        //Get actual TotalSupply NFM
-        uint256 NFMTotalSupply = IERC20(address(_Controller._getNFM()))
-            .totalSupply();
-        //Get full Amount of Coin
-        uint256 CoinTotal = IERC20(address(_CoinsArray[_SwapCounter]))
-            .balanceOf(address(this));
-        //Get Coindecimals for calculations
-        uint256 CoinDecimals = IERC20(address(_CoinsArray[_SwapCounter]))
-            .decimals();
-        if (CoinDecimals < 18) {
-            //if smaller than 18 Digits, convert to 18 digits
-            CoinTotal = CoinTotal * 10**(18 - CoinDecimals);
-        }
-        //Calculate how much Coin will receive each NFM.
-        uint256 CoinvsNFM = SafeMath.div(
-            SafeMath.mul(CoinTotal, 10**18),
-            NFMTotalSupply
-        );
-        if (CoinDecimals < 18) {
-            //If coin decimals not equal to 18, return to coin decimals
-            CoinvsNFM = SafeMath.div(CoinvsNFM, 10**(18 - CoinDecimals));
-        }
-        CoinProNFM = CoinvsNFM;
-        return true;
+        return false;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -388,59 +483,136 @@ contract NFMAirdrop {
     multiple bonus payments.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _getAmountToPay(address Sender, uint256 Amount)
+    function _getAmountToPay(address Sender, address Coin)
         internal
         virtual
         returns (uint256)
     {
-        (
-            uint256 issuedate,
-            uint256 timestampBal,
-            uint256 balanceAmount,
-            bool status
-        ) = INFM(address(_Controller._getNFM())).bonusCheck(address(Sender));
-        if (
-            issuedate <
-            INfmTimer(address(_Controller._getTimer()))
-                ._getExtraBonusAllTime() &&
-            timestampBal <
-            INfmTimer(address(_Controller._getTimer()))
-                ._getEndExtraBonusAllTime() &&
-            status == true
-        ) {
-            //Substract sending amount from senders balance before making calculations
-            uint256 SenderBal = SafeMath.sub(balanceAmount, Amount);
-            //Calculate Bonus amount for sender.
-            uint256 CoinDecimals = IERC20(address(_CoinsArray[_SwapCounter]))
-                .decimals();
-            uint256 CoinEighteen;
-            if (CoinDecimals < 18) {
-                //if smaller than 18 Digits, convert to 18 digits
-                CoinEighteen = CoinProNFM * 10**(18 - CoinDecimals);
-            }
-            uint256 PayAmount = SafeMath.div(
-                SafeMath.mul(SenderBal, CoinEighteen),
-                10**18
-            );
-            if (CoinDecimals < 18) {
-                //if smaller than 18 Digits, convert to 18 digits
-                PayAmount = SafeMath.div(PayAmount, 10**(18 - CoinDecimals));
-            }
-            return PayAmount;
-        } else {
-            return 0;
+        uint256 balanceAmount = INFM(address(_Controller._getNFM())).bonusCheck(
+            address(Sender)
+        );
+        //Calculate Bonus amount for sender.
+        uint256 CoinDecimals = IERC20(address(Coin)).decimals();
+        uint256 CoinEighteen;
+        if (CoinDecimals < 18) {
+            //if smaller than 18 Digits, convert to 18 digits
+            CoinEighteen = _CoinforNFM[Coin] * 10**(18 - CoinDecimals);
         }
+        uint256 PayAmount = SafeMath.div(
+            SafeMath.mul(balanceAmount, CoinEighteen),
+            10**18
+        );
+        if (CoinDecimals < 18) {
+            //if smaller than 18 Digits, convert to Coin digits
+            PayAmount = SafeMath.div(PayAmount, 10**(18 - CoinDecimals));
+        }
+        return PayAmount;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @updateSchalter() returns (bool);
-    This function updates the switcher
+    This function updates the switcher. This is used to separate logic that has to be executed once for the event from 
+    the rest of the logic
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function updateSchalter() public onlyOwner returns (bool) {
         Schalter = 0;
         return true;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @startAirdropLogic() returns (bool);
+    This function creates all calculations for the upcoming airdrop once. A maximum of 3 different tokens in one payout are possible.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _startAirdropLogic() public onlyOwner returns (bool) {
+        if (allCoinsCounter > 0) {
+            if (lastRoundCounter == allCoinsCounter) {
+                //No Airdrops available
+                return false;
+            } else {
+                lastRoundCounter = nextRoundCounter;
+                uint256 nextindexes = lastRoundCounter + 3;
+                uint256 calcounter = lastRoundCounter;
+                if (nextindexes > allCoinsCounter) {
+                    //take allCoinsCounter as indexer
+                    nextRoundCounter = allCoinsCounter;
+                    while (calcounter != allCoinsCounter) {
+                        calcounter++;
+                        if (
+                            _showAirdropStatus(_allIdoCoins[calcounter]) == true
+                        ) {
+                            //Make calculations
+                            if (makeCalc(_allIdoCoins[calcounter]) == false) {
+                                _CoinforNFM[_allIdoCoins[calcounter]] = 0;
+                            }
+                        }
+                    }
+                    return true;
+                } else {
+                    //take nextindexes as indexer
+                    nextRoundCounter = nextindexes;
+                    while (calcounter != nextindexes) {
+                        calcounter++;
+                        if (
+                            _showAirdropStatus(_allIdoCoins[calcounter]) == true
+                        ) {
+                            //Make calculations
+                            if (makeCalc(_allIdoCoins[calcounter]) == false) {
+                                _CoinforNFM[_allIdoCoins[calcounter]] = 0;
+                            }
+                        }
+                    }
+                    return true;
+                }
+            }
+        } else {
+            //No Airdrops available
+            return false;
+        }
+    }
+
+    function _getAirdrop(address Sender) public onlyOwner returns (bool) {
+        if (Schalter == 0) {
+            if (_startAirdropLogic() == true) {
+                Schalter = 1;
+                return true;
+            }
+            return false;
+        } else {
+            ///     lastRoundCounter contains inicializing index and nextRoundCounter contains final index (3 Airdrop Tokens maximum)
+            uint256 calcounter = lastRoundCounter;
+            while (calcounter != nextRoundCounter) {
+                calcounter++;
+                ///     Check if Airdrop is whitelisted
+                if (_showAirdropStatus(_allIdoCoins[calcounter]) == true) {
+                    ///     Check if value per NFM is bigger as zero (then Airdrop exists)
+                    if (_CoinforNFM[_allIdoCoins[calcounter]] > 0) {
+                        ///     If Value per NFM exists, payout can be made
+                        uint256 airdropAmount = _getAmountToPay(
+                            Sender,
+                            address(_allIdoCoins[calcounter])
+                        );
+                        IERC20(address(_allIdoCoins[calcounter])).transfer(
+                            Sender,
+                            airdropAmount
+                        );
+                        //Save an payout event on each Airdrop
+                        emit Airdrops(
+                            Sender,
+                            _allIdoCoins[calcounter],
+                            airdropAmount,
+                            block.timestamp
+                        );
+                    }
+                }
+            }
+            //Update Timestamp as Paid on receiver
+            _wasPaidCheck[Sender] = INfmTimer(_Controller._getTimer())
+                ._getEndExtraBonusAirdropTime();
+        }
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

@@ -99,36 +99,6 @@ interface INfmController {
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// INFMUV2POOL
-//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-interface INfmUV2Pool {
-    function _returnCoinsArray() external view returns (address[] memory);
-
-    function _showContractBalanceOf(address Coin)
-        external
-        view
-        returns (uint256);
-
-    function _showPairNum() external view returns (uint256);
-
-    function getamountOutOnSwap(uint256 amount, address Coin)
-        external
-        view
-        returns (uint256);
-
-    function swapNFMforTokens(address Coin, uint256 amount)
-        external
-        returns (bool);
-
-    function _getWithdraw(
-        address Coin,
-        address To,
-        uint256 amount,
-        bool percent
-    ) external returns (bool);
-}
-
-//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // INFMTIMER
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface INfmTimer {
@@ -187,52 +157,22 @@ interface INFM {
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// INFMEXCHANGE
-//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-interface INfmExchange {
-    function withdraw(
-        address Coin,
-        address To,
-        uint256 amount,
-        bool percent
-    ) external returns (bool);
-
-    function calcNFMAmount(
-        address Coin,
-        uint256 amount,
-        uint256 offchainOracle
-    )
-        external
-        view
-        returns (
-            bool check,
-            uint256 NFMsAmount,
-            uint256 MedianPrice,
-            bool MaxPrice,
-            bool MinPrice
-        );
-
-    function checkOracle1Price(address Coin) external view returns (uint256);
-}
-
-//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /// @title NFMBonus.sol
 /// @author Fernando Viktor Seidl E-mail: viktorseidl@gmail.com
-/// @notice This contract regulates the special payments from other currencies like WBTC,WBNB, WETH,...to the NFM community
+/// @notice This contract regulates the special payments of currencies like WBTC,WBNB, WETH,...to the NFM community
 /// @dev This extension regulates a special payout from different currencies like WBTC, WETH,... to the community every 100 days. Payments are
-///      made in the form of a withdrawal.
+///      made in the form of a transfer.
 ///
 ///         INFO:
 ///         -   Every 100 days, profit distributions are made available to this protocol in various currencies by the treasury and the UV2Pool
-///             in different currencies. The profits are generated from Treasury investments and one-time swaps of the UniswapV2 protocol.
+///             in different currencies. The profits are generated from Treasury Vaults investments and one-time swaps of the UniswapV2 protocol.
 ///         -   As soon as the amounts are available, a fee per NFM will be calculated. The calculation is as follows:
 ///             Amount available for distribution / NFM total supply = X
 ///         -   The distribution happens automatically during the transaction. As soon as an NFM owner makes a transfer within the bonus window,
 ///             the bonus will automatically be calculated on his NFM balance and credited to his account. The NFM owner is informed about upcoming
-///             special payments via the homepage. A prerequisite for participation in the bonus payments is a minimum balance of 150 NFM on the
+///             special payments via the homepage. A prerequisite for participation in the bonus payments is a minimum balance of 250 NFM on the
 ///             participant's account.
-///         -   The currencies to be paid out are based on the UniswapV2 protocol. Permitted currencies from this protocol are also provided for
-///             the bonus payments. It is possible to receive additional shares from the IDO Launchpad.
+///         -   The currencies to be paid out are based on the UniswapV2 protocol.
 ///         -   The payout window is set to 24 hours. Every NFM owner who makes a transfer within this period will automatically have his share
 ///             credited to his account. All remaining amounts will be partially credited to the staking pool after the end of the time window,
 ///             and another portion will be returned to the treasury for investments.
@@ -308,125 +248,6 @@ contract NFMExtraBonus {
         INfmController Cont = INfmController(Controller);
         _Controller = Cont;
         _SController = Controller;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @_checkSwapCounter() returns (bool);
-    This function checks the array index to use
-     */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _checkSwapCounter() public onlyOwner returns (bool) {
-        if (_SwapCounter == _CoinArrLength) {
-            _SwapCounter = 0;
-        }
-        return true;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @_checkOnNewPairs() returns (bool);
-    This function checks whether new currencies have been implemented for the bonus system
-     */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _checkOnNewPairs() public onlyOwner returns (bool) {
-        uint256 Coins = INfmUV2Pool(address(_Controller._getUV2Pool()))
-            ._showPairNum();
-        if (Coins > _CoinArrLength) {
-            _CoinArrLength = Coins;
-            _CoinsArray = INfmUV2Pool(address(_Controller._getUV2Pool()))
-                ._returnCoinsArray();
-        }
-        return true;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @checkforLiquify() returns (bool);
-    This feature checks for the possibility of a swap to ensure a bigger bonus.
-     */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function checkforLiquify() public view onlyOwner returns (bool) {
-        //Get NFM Balance of UV2Pool
-        uint256 NFMBalanceUV2 = INfmUV2Pool(address(_Controller._getUV2Pool()))
-            ._showContractBalanceOf(address(_Controller._getNFM()));
-        //Get Amount of Coin if Swapping 50000 NFM
-        uint256 CoinAmountAsBonus = INfmUV2Pool(
-            address(_Controller._getUV2Pool())
-        ).getamountOutOnSwap(50000 * 10**18, address(_Controller._getNFM()));
-        //Check USD Value on Coin (is 18 Digits format)
-        uint256 USDValueCoin = INfmExchange(address(_Controller._getExchange()))
-            .checkOracle1Price(address(_CoinsArray[_SwapCounter]));
-        //Get Coin Decimals for calculations
-        uint256 CoinDec = IERC20(address(_CoinsArray[_SwapCounter])).decimals();
-        //if Coin decimals smaller than 18 digits, convert to 18 digits.
-        if (CoinDec < 18) {
-            CoinAmountAsBonus = CoinAmountAsBonus * 10**(18 - CoinDec);
-        }
-        //Calculate USD Value of possible Swap
-        uint256 Total = SafeMath.div(
-            SafeMath.mul(CoinAmountAsBonus, USDValueCoin),
-            10**18
-        );
-        //If USD Value bigger as 10000 USD, then approve Swap (return true)
-        if (Total >= 10000 * 10**18) {
-            if (NFMBalanceUV2 >= 50000 * 10**18) {
-                return true;
-            } else {
-                return false;
-            }
-        } else {
-            //Makes no sense to swap for that small money.
-            return false;
-        }
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @doSwap() returns (bool);
-    This function performs the swap if there is a swap option.
-     */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function doSwap() public onlyOwner returns (bool) {
-        if (
-            INfmUV2Pool(address(_Controller._getUV2Pool())).swapNFMforTokens(
-                address(_CoinsArray[_SwapCounter]),
-                50000 * 10**18
-            ) == true
-        ) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @withdrawToBonusSC() returns (bool);
-    This function debits 90% of the existing credit in the UV2Pool for the bonus payments
-     */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function withdrawToBonusSC() public onlyOwner returns (bool) {
-        if (
-            IERC20(address(_CoinsArray[_SwapCounter])).balanceOf(
-                address(_Controller._getUV2Pool())
-            ) > 0
-        ) {
-            if (
-                INfmUV2Pool(address(_Controller._getUV2Pool()))._getWithdraw(
-                    address(_CoinsArray[_SwapCounter]),
-                    address(this),
-                    90,
-                    true
-                ) == true
-            ) {
-                return true;
-            } else {
-                return false;
-            }
-        } else {
-            return false;
-        }
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -524,79 +345,6 @@ contract NFMExtraBonus {
     function updateSchalter() public onlyOwner returns (bool) {
         Schalter = 0;
         return true;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @_getBonus(address from, uint256 amount) returns (bool);
-    This feature executes the payouts of the bonus
-     */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _getBonus(address from, uint256 amount)
-        public
-        virtual
-        onlyOwner
-        returns (bool)
-    {
-        if (
-            _wasPaidCheck[from] ==
-            INfmTimer(address(_Controller._getTimer()))
-                ._getEndExtraBonusAllTime()
-        ) {
-            return true;
-        } else {
-            //First check on new Coins
-            _checkOnNewPairs();
-            _checkSwapCounter();
-
-            //Make first full calculation for all Bonuses
-            //Swap and calculate Bonuses for all only once on each turn
-            if (Schalter == 0) {
-                if (checkforLiquify() == true) {
-                    doSwap();
-                }
-                if (withdrawToBonusSC() == true) {
-                    makeCalc();
-                    IsBonus = true;
-                    Schalter = 1;
-                } else {
-                    IsBonus = false;
-                    Schalter = 1;
-                }
-            }
-            if (IsBonus == true) {
-                //Get Bonus Amount to pay on senders Balance
-                uint256 CAmount = _getAmountToPay(from, amount);
-                if (CAmount == 0) {
-                    _wasPaidCheck[from] = INfmTimer(
-                        address(_Controller._getTimer())
-                    )._getEndExtraBonusAllTime();
-                    return true;
-                } else {
-                    if (
-                        IERC20(address(_CoinsArray[_SwapCounter])).transfer(
-                            from,
-                            CAmount
-                        ) == true
-                    ) {
-                        emit EBonus(
-                            from,
-                            address(_CoinsArray[_SwapCounter]),
-                            CAmount,
-                            block.timestamp
-                        );
-                        _wasPaidCheck[from] = INfmTimer(
-                            address(_Controller._getTimer())
-                        )._getEndExtraBonusAllTime();
-                        return true;
-                    } else {
-                        return true;
-                    }
-                }
-            } else {
-                return true;
-            }
-        }
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

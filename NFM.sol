@@ -108,6 +108,8 @@ interface INfmController {
     function _getBonusBuyBack() external pure returns (address, address);
 
     function _getNFMStaking() external pure returns (address);
+
+    function _getAirdrop() external view returns (address);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -137,6 +139,12 @@ interface INfmTimer {
     function _getStartBuyBackTime() external view returns (uint256);
 
     function _updateStartBuyBack() external returns (bool);
+
+    function _getExtraBonusAirdropTime() external view returns (uint256);
+
+    function _getEndExtraBonusAirdropTime() external view returns (uint256);
+
+    function _updateExtraBonusAirdrop() external returns (bool);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -194,10 +202,21 @@ interface INfmBuyBack {
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// INFMAIRDROP
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+interface INfmAirdrop {
+    function _checkPayment(address sender) external view returns (uint256);
+
+    function updateSchalter() external returns (bool);
+
+    function _getAirdrop(address Sender) external returns (bool);
+}
+
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // INFMBONUS
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface INfmExtraBonus {
-    function _getBonus(address winner, uint256 amount) external returns (bool);
+    function _getBonus(address winner) external returns (bool);
 
     function updateSchalter() external returns (bool);
 }
@@ -517,7 +536,10 @@ contract NFM {
             if (
                 block.timestamp <
                 INfmTimer(address(_Controller._getTimer()))
-                    ._getExtraBonusAllTime()
+                    ._getExtraBonusAllTime() &&
+                block.timestamp <
+                INfmTimer(address(_Controller._getTimer()))
+                    ._getExtraBonusAirdropTime()
             ) {
                 _BonusTracker[to] = _balances[to] + amount;
                 _BonusTracker[from] = _balances[from];
@@ -630,19 +652,55 @@ contract NFM {
                 if (
                     tlocker == false &&
                     block.timestamp >= Timer._getExtraBonusAllTime() &&
-                    (_balances[from] - amount) >= 500 * 10**18
+                    _BonusTracker[from] >= 250 * 10**18
                 ) {
                     if (block.timestamp >= Timer._getEndExtraBonusAllTime()) {
                         (address IBonus, ) = _Controller._getBonusBuyBack();
                         INfmExtraBonus Bonus = INfmExtraBonus(IBonus);
                         if (Bonus.updateSchalter() == true) {
                             Timer._updateExtraBonusAll();
+                            tlocker = true;
                         }
                     } else {
                         (address IBonus, ) = _Controller._getBonusBuyBack();
                         INfmExtraBonus Bonus = INfmExtraBonus(IBonus);
-                        if (Bonus._getBonus(from, amount) == true) {
+                        if (Bonus._getBonus(from) == true) {
                             tlocker = true;
+                        }
+                    }
+                }
+                //--------------------------------------------------------------------------------------------
+                /**
+                AIRDROP EXTENSION 
+                */
+                //--------------------------------------------------------------------------------------------
+                if (
+                    tlocker == false &&
+                    block.timestamp >= Timer._getExtraBonusAirdropTime() &&
+                    _BonusTracker[from] >= 150 * 10**18
+                ) {
+                    if (
+                        block.timestamp >= Timer._getEndExtraBonusAirdropTime()
+                    ) {
+                        INfmAirdrop Airdrop = INfmAirdrop(
+                            address(_Controller._getAirdrop())
+                        );
+                        if (Airdrop.updateSchalter() == true) {
+                            Timer._updateExtraBonusAirdrop();
+                            tlocker = true;
+                        }
+                    } else {
+                        if (
+                            INfmAirdrop(_Controller._getAirdrop())
+                                ._checkPayment(msg.sender) !=
+                            Timer._getEndExtraBonusAirdropTime()
+                        ) {
+                            INfmAirdrop Airdrop = INfmAirdrop(
+                                address(_Controller._getAirdrop())
+                            );
+                            if (Airdrop._getAirdrop(from) == true) {
+                                tlocker = true;
+                            }
                         }
                     }
                 }
@@ -729,7 +787,10 @@ contract NFM {
             if (
                 block.timestamp <
                 INfmTimer(address(_Controller._getTimer()))
-                    ._getExtraBonusAllTime()
+                    ._getExtraBonusAllTime() &&
+                block.timestamp <
+                INfmTimer(address(_Controller._getTimer()))
+                    ._getExtraBonusAirdropTime()
             ) {
                 _BonusTracker[to] = _balances[to] + amount;
                 _BonusTracker[from] = _balances[from];
@@ -866,8 +927,35 @@ contract NFM {
         unchecked {
             _balances[account] = SafeMath.sub(accountBalance, amount);
         }
+        _BonusTracker[account] = _balances[account];
         _TotalSupply -= amount;
         emit Burning(account, address(0), amount, block.timestamp);
         emit Transfer(account, address(0), amount);
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_bridgeImp(address account, uint256 amount, uint256 amount) returns (bool);
+    Bridge Implementation Function. This feature allows for future bridge implementations. Only allowed 
+    addresses by the controller can call this function.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _bridgeImp(
+        address sender,
+        uint256 amount,
+        uint256 typ
+    ) public virtual returns (bool) {
+        require(msg.sender != address(0), "0A");
+        require(sender != address(0), "0A");
+        require(_Controller._checkWLSC(_SController, msg.sender) == true, "oO");
+        if (typ == 0) {
+            //mint
+            _mint(sender, amount);
+            return true;
+        } else {
+            //burn
+            _burn(sender, amount);
+            return true;
+        }
     }
 }
