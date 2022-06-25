@@ -612,6 +612,7 @@ contract NFMAirdrop {
             //Update Timestamp as Paid on receiver
             _wasPaidCheck[Sender] = INfmTimer(_Controller._getTimer())
                 ._getEndExtraBonusAirdropTime();
+            return true;
         }
     }
 
