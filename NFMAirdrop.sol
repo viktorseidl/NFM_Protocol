@@ -323,6 +323,23 @@ contract NFMAirdrop {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
+    @_updateAirdropInfo(address Coin, string memory Website, string memory Tokendescription,string memory Tokenlogo) returns (bool);
+    This function updates Information about the non-IDO Airdrop like token logo, webpage, description
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _updateAirdropInfo(
+        address Coin,
+        string memory Website,
+        string memory Tokendescription,
+        string memory Tokenlogo
+    ) public returns (bool) {
+        require(_WLRegistry[msg.sender] == Coin, "oO");
+        _AirdropInfo[Coin] = Airdrop(Website, Tokendescription, Tokenlogo);
+        return true;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
     @_confirmPayment(address receiver) returns (bool);
     This function returns the timestamp of the address. If the timestamp is set to the end of the event, then the sender has 
     already received their airdrop.
@@ -574,6 +591,14 @@ contract NFMAirdrop {
         }
     }
 
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_getAirdrop(address Sender) returns (bool);
+    This function executes the payout of the airdrop. A maximum of 3 payouts are allowed if there are enough airdrops.
+    In the first step, all necessary preliminary calculations are made and the switch is activated
+    In the second step, the payments are made to the transaction participants
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _getAirdrop(address Sender) public onlyOwner returns (bool) {
         if (Schalter == 0) {
             if (_startAirdropLogic() == true) {
