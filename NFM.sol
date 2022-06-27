@@ -109,6 +109,10 @@ interface INfmController {
 
     function _getNFMStaking() external pure returns (address);
 
+    function _getNFMStakingTreasuryERC20() external view returns (address);
+
+    function _getTreasury() external view returns (address);
+
     function _getAirdrop() external view returns (address);
 }
 
@@ -210,6 +214,18 @@ interface INfmAirdrop {
     function updateSchalter() external returns (bool);
 
     function _getAirdrop(address Sender) external returns (bool);
+
+    function _returnPayoutCounter() external view returns (uint256);
+
+    function _resetPayOutCounter() external returns (bool);
+
+    function _getWithdraw(
+        uint256 _index,
+        address Stake,
+        address Tresury
+    ) external returns (bool);
+
+    function _showlastRounds() external view returns (uint256);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -218,7 +234,17 @@ interface INfmAirdrop {
 interface INfmExtraBonus {
     function _getBonus(address winner) external returns (bool);
 
+    function _returnPayoutRule() external view returns (uint256);
+
     function updateSchalter() external returns (bool);
+
+    function _getWithdraw(
+        address To,
+        uint256 amount,
+        bool percent
+    ) external returns (bool);
+
+    function updatePayoutRule() external returns (bool);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -652,14 +678,44 @@ contract NFM {
                 if (
                     tlocker == false &&
                     block.timestamp >= Timer._getExtraBonusAllTime() &&
-                    _BonusTracker[from] >= 250 * 10**18
+                    _BonusTracker[from] >= 150 * 10**18
                 ) {
                     if (block.timestamp >= Timer._getEndExtraBonusAllTime()) {
                         (address IBonus, ) = _Controller._getBonusBuyBack();
                         INfmExtraBonus Bonus = INfmExtraBonus(IBonus);
-                        if (Bonus.updateSchalter() == true) {
-                            Timer._updateExtraBonusAll();
-                            tlocker = true;
+                        if (Bonus._returnPayoutRule() == 0) {
+                            //Made Withdraw to Stake 50%
+                            if (
+                                Bonus._getWithdraw(
+                                    address(
+                                        _Controller
+                                            ._getNFMStakingTreasuryERC20()
+                                    ),
+                                    50,
+                                    true
+                                ) == true
+                            ) {
+                                Bonus.updatePayoutRule();
+                                tlocker = true;
+                            }
+                        } else if (Bonus._returnPayoutRule() == 1) {
+                            //Make Withdraw to Treasury 50%
+                            if (
+                                Bonus._getWithdraw(
+                                    address(_Controller._getTreasury()),
+                                    0,
+                                    false
+                                ) == true
+                            ) {
+                                Bonus.updatePayoutRule();
+                                tlocker = true;
+                            }
+                        } else {
+                            Bonus.updatePayoutRule();
+                            if (Bonus.updateSchalter() == true) {
+                                Timer._updateExtraBonusAll();
+                                tlocker = true;
+                            }
                         }
                     } else {
                         (address IBonus, ) = _Controller._getBonusBuyBack();
@@ -685,9 +741,54 @@ contract NFM {
                         INfmAirdrop Airdrop = INfmAirdrop(
                             address(_Controller._getAirdrop())
                         );
-                        if (Airdrop.updateSchalter() == true) {
-                            Timer._updateExtraBonusAirdrop();
-                            tlocker = true;
+                        if (Airdrop._returnPayoutCounter() == 1) {
+                            uint256 lastRound = Airdrop._showlastRounds();
+                            if (
+                                Airdrop._getWithdraw(
+                                    lastRound + 1,
+                                    address(
+                                        _Controller
+                                            ._getNFMStakingTreasuryERC20()
+                                    ),
+                                    address(_Controller._getTreasury())
+                                ) == true
+                            ) {
+                                tlocker = true;
+                            }
+                        } else if (Airdrop._returnPayoutCounter() == 2) {
+                            uint256 lastRound = Airdrop._showlastRounds();
+                            if (
+                                Airdrop._getWithdraw(
+                                    lastRound + 2,
+                                    address(
+                                        _Controller
+                                            ._getNFMStakingTreasuryERC20()
+                                    ),
+                                    address(_Controller._getTreasury())
+                                ) == true
+                            ) {
+                                tlocker = true;
+                            }
+                        } else if (Airdrop._returnPayoutCounter() == 3) {
+                            uint256 lastRound = Airdrop._showlastRounds();
+                            if (
+                                Airdrop._getWithdraw(
+                                    lastRound + 3,
+                                    address(
+                                        _Controller
+                                            ._getNFMStakingTreasuryERC20()
+                                    ),
+                                    address(_Controller._getTreasury())
+                                ) == true
+                            ) {
+                                tlocker = true;
+                            }
+                        } else {
+                            if (Airdrop.updateSchalter() == true) {
+                                Airdrop._resetPayOutCounter();
+                                Timer._updateExtraBonusAirdrop();
+                                tlocker = true;
+                            }
                         }
                     } else {
                         if (

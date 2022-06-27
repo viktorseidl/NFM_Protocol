@@ -192,6 +192,7 @@ contract NFMAirdrop {
     uint256 public lastRoundCounter = 0;
     uint256 public nextRoundCounter = 0;
     uint256 private Schalter = 0;
+    uint256 public PayOutCounter = 1;
     address[] private AirdropCoins;
     struct Airdrop {
         string Webpage;
@@ -295,6 +296,16 @@ contract NFMAirdrop {
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _showUpComingAirdrops() public view returns (uint256) {
         return nextRoundCounter;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_showlastRounds() returns (uint256);
+    This function gives the index number of the last starting point.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _showlastRounds() public view returns (uint256) {
+        return lastRoundCounter;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -643,32 +654,63 @@ contract NFMAirdrop {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    @_getWithdraw(address Coin, address To, uint256 amount, bool percent)  returns (bool);
+    @_returnPayoutCounter()  returns (uint256);
+    This function returns the withdraw counter.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returnPayoutCounter() public view returns (uint256) {
+        return PayOutCounter;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_resetPayOutCounter()  returns (bool);
+    This function reset the withdraw counter.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _resetPayOutCounter() public onlyOwner returns (bool) {
+        PayOutCounter = 1;
+        return true;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_getWithdraw(uint256 _index, address StakeReserve, address Treasury)  returns (bool);
     This function is responsible for the distribution of the remaining bonus payments that have not been redeemed. The remaining 
     balance is split between the staking pool and treasury.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _getWithdraw(
-        address Coin,
-        address To,
-        uint256 amount,
-        bool percent
+        uint256 _index,
+        address Stake,
+        address Tresury
     ) public onlyOwner returns (bool) {
-        uint256 CoinAmount = IERC20(address(Coin)).balanceOf(address(this));
-        if (percent == true) {
-            //makeCalcs on Percentatge
-            uint256 AmountToSend = SafeMath.div(
-                SafeMath.mul(CoinAmount, amount),
-                100
-            );
-            IERC20(address(Coin)).transfer(To, AmountToSend);
-            return true;
-        } else {
-            if (amount == 0) {
-                IERC20(address(Coin)).transfer(To, CoinAmount);
+        if (AirdropCoins.length > 0) {
+            if (_showAirdropStatus(_allIdoCoins[_index]) == true) {
+                uint256 CoinAmount = IERC20(_allIdoCoins[_index]).balanceOf(
+                    address(this)
+                );
+                //makeCalcs on Percentatge
+                uint256 AmountToSend = SafeMath.div(
+                    SafeMath.mul(CoinAmount, 50),
+                    100
+                );
+                IERC20(address(_allIdoCoins[_index])).transfer(
+                    Stake,
+                    AmountToSend
+                );
+                IERC20(address(_allIdoCoins[_index])).transfer(
+                    Tresury,
+                    (CoinAmount - AmountToSend)
+                );
+                PayOutCounter++;
+                return true;
             } else {
-                IERC20(address(Coin)).transfer(To, amount);
+                PayOutCounter++;
+                return true;
             }
+        } else {
+            PayOutCounter++;
             return true;
         }
     }
