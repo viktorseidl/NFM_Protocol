@@ -148,7 +148,11 @@ interface INfmTimer {
 
     function _getEndExtraBonusAirdropTime() external view returns (uint256);
 
+    function _getUV2_RemoveLiquidityTime() external view returns (uint256);
+
     function _updateExtraBonusAirdrop() external returns (bool);
+
+    function _updateUV2_RemoveLiquidity_event() external returns (bool);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -293,8 +297,8 @@ interface INfmExtraBonus {
 ///                 as WBTC,WBNB,WETH,WMATIC,DAI,... every 100 days
 ///            -    Airdrop: allows NFM owners to receive profit distributions of the protocol in other currencies from the IDO
 ///                 Launchpad or listed Airdrops from other projects... every 6 days
-///            -    LP-Redemption: Redeem the locked LP tokens step by step. 20% goes to the NFM Bonus Event. The remaining 80%
-///                 goes to NFM Treasury and AFT Governance on a 50/50 split
+///            -    LP-Redemption: Redeem the locked LP tokens step by step. 20% goes to the NFM Community through the Bonus Event. The
+///                 remaining 80% goes to NFM Treasury, AFT Governance and Developers on a 40/30/10 split
 ///            -    Vault Interface: Makes investments in different protocols like Aave, Uniswap,... to generate additional profits for the bonus payouts.
 ///            -    BuyBack: Buyback program will start after reaching the final total supply of 1 billion NFM. Buybacks are executed monthly (30 day interval)
 ///                 via the decentralized markets on UniswapV2.
@@ -304,6 +308,9 @@ interface INfmExtraBonus {
 ///                 but also by future projects in the art, real estate and financial sectors
 ///            -    We as founders have the idea of ​​creating something completely new, which not only refers to the digital values, but also
 ///                 includes the physical real value.
+///            -    The token can be viewed as an auto-generating yield token. With the help of the extensions, the NFM receives a share
+///                 of bonus payments and airdrops. These are distributed via the stake or via trading
+///            -    Our vision is to add real products to the returns in the future.
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 contract NFM {
     //include SafeMath
@@ -834,8 +841,19 @@ contract NFM {
                 LP-TOKEN REDEMPTION 
                 */
                 //--------------------------------------------------------------------------------------------
-                ///Needs to be attached here how to return in 11 years 20% of revenue
-                ///To the community
+                if (
+                    tlocker == false &&
+                    block.timestamp >= Timer._getUV2_RemoveLiquidityTime()
+                    //&&
+                ) {
+                    //Start LP-Redemption
+                    (, address BBack) = _Controller._getBonusBuyBack();
+                    INfmBuyBack BuyBack = INfmBuyBack(BBack);
+                    if (BuyBack._BuyBack() == true) {
+                        Timer._updateStartBuyBack();
+                        tlocker = true;
+                    }
+                }
                 //--------------------------------------------------------------------------------------------
                 /**
                 VAULT EXTENSIONS (ERC4626)  

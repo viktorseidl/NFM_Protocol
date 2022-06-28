@@ -116,7 +116,7 @@ contract NFMTimer {
         _UV2_RemoveLiquidity_event =
             block.timestamp +
             (_YearInterval * 11) +
-            (_DayInterval * CountDays); //One Time Event in 11 Years
+            (_DayInterval * CountDays); //Time Event in 11 Years
         _DailyMint = block.timestamp + (_DayInterval * (CountDays + 1)); //Every Day for 8 Years
         _BeginLogic = block.timestamp + (_DayInterval * CountDays); //Timestamp for logic start
         _EndMint =
@@ -233,6 +233,23 @@ contract NFMTimer {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _updateDailyMint() public onlyOwner returns (bool) {
         _DailyMint = _DailyMint + _DayInterval;
+        return true;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_updateUV2_RemoveLiquidity_event()  returns (bool);
+    This function updates the Mint timestamp
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _updateUV2_RemoveLiquidity_event()
+        public
+        onlyOwner
+        returns (bool)
+    {
+        _UV2_RemoveLiquidity_event =
+            _UV2_RemoveLiquidity_event +
+            (_DayInterval * 29);
         return true;
     }
 
