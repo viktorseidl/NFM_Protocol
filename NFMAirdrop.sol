@@ -194,6 +194,7 @@ contract NFMAirdrop {
     uint256 private Schalter = 0;
     uint256 public PayOutCounter = 1;
     address[] private AirdropCoins;
+    bool private threeAirdrops = true;
     struct Airdrop {
         string Webpage;
         string Description;
@@ -611,45 +612,50 @@ contract NFMAirdrop {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _getAirdrop(address Sender) public onlyOwner returns (bool) {
-        if (Schalter == 0) {
-            if (_startAirdropLogic() == true) {
-                Schalter = 1;
-                return true;
-            }
-            return false;
-        } else {
-            ///     lastRoundCounter contains inicializing index and nextRoundCounter contains final index (3 Airdrop Tokens maximum)
-            uint256 calcounter = lastRoundCounter;
-            while (calcounter != nextRoundCounter) {
-                calcounter++;
-                ///     Check if Airdrop is whitelisted
-                if (_showAirdropStatus(_allIdoCoins[calcounter]) == true) {
-                    ///     Check if value per NFM is bigger as zero (then Airdrop exists)
-                    if (_CoinforNFM[_allIdoCoins[calcounter]] > 0) {
-                        ///     If Value per NFM exists, payout can be made
-                        uint256 airdropAmount = _getAmountToPay(
-                            Sender,
-                            address(_allIdoCoins[calcounter])
-                        );
-                        IERC20(address(_allIdoCoins[calcounter])).transfer(
-                            Sender,
-                            airdropAmount
-                        );
-                        //Save an payout event on each Airdrop
-                        emit Airdrops(
-                            Sender,
-                            _allIdoCoins[calcounter],
-                            airdropAmount,
-                            block.timestamp
-                        );
+        if (AirdropCoins.length > nextRoundCounter + 3) {
+            threeAirdrops = true;
+            if (Schalter == 0) {
+                if (_startAirdropLogic() == true) {
+                    Schalter = 1;
+                    return true;
+                }
+                return false;
+            } else {
+                ///     lastRoundCounter contains inicializing index and nextRoundCounter contains final index (3 Airdrop Tokens maximum)
+                uint256 calcounter = lastRoundCounter;
+                while (calcounter != nextRoundCounter) {
+                    calcounter++;
+                    ///     Check if Airdrop is whitelisted
+                    if (_showAirdropStatus(_allIdoCoins[calcounter]) == true) {
+                        ///     Check if value per NFM is bigger as zero (then Airdrop exists)
+                        if (_CoinforNFM[_allIdoCoins[calcounter]] > 0) {
+                            ///     If Value per NFM exists, payout can be made
+                            uint256 airdropAmount = _getAmountToPay(
+                                Sender,
+                                address(_allIdoCoins[calcounter])
+                            );
+                            IERC20(address(_allIdoCoins[calcounter])).transfer(
+                                Sender,
+                                airdropAmount
+                            );
+                            //Save an payout event on each Airdrop
+                            emit Airdrops(
+                                Sender,
+                                _allIdoCoins[calcounter],
+                                airdropAmount,
+                                block.timestamp
+                            );
+                        }
                     }
                 }
+                //Update Timestamp as Paid on receiver
+                _wasPaidCheck[Sender] = INfmTimer(_Controller._getTimer())
+                    ._getEndExtraBonusAirdropTime();
+                return true;
             }
-            //Update Timestamp as Paid on receiver
-            _wasPaidCheck[Sender] = INfmTimer(_Controller._getTimer())
-                ._getEndExtraBonusAirdropTime();
-            return true;
         }
+        threeAirdrops = false;
+        return false;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -685,7 +691,7 @@ contract NFMAirdrop {
         address Stake,
         address Tresury
     ) public onlyOwner returns (bool) {
-        if (AirdropCoins.length > 0) {
+        if (threeAirdrops == true) {
             if (_showAirdropStatus(_allIdoCoins[_index]) == true) {
                 uint256 CoinAmount = IERC20(_allIdoCoins[_index]).balanceOf(
                     address(this)

@@ -262,6 +262,9 @@ interface INfmExtraBonus {
 ///            -    Liquidity Interface
 ///            -    Burning Interface
 ///            -    Bonus Interface
+///            -    Airdrop Interface
+///            -    Vault Interface
+///            -    LP-Redemption Interface
 ///            -    BuyBack Interface
 ///
 ///            TOKEN DETAILS:
@@ -272,17 +275,35 @@ interface INfmExtraBonus {
 ///            -    Token Symbol: NFM
 ///
 ///            TOKEN EXTENSIONS:
-///            -    PAD: Pump and Dump security
-///            -    Minting: 7,600,000,000 NFM are created by minting in 8 years
-///            -    Burning: 7,000,000,000 NFM are destroyed by burning process starting after 4 years with a burning fee of 2%
+///            -    PAD (Pump and Dump security): Used to protect against pump and dump actions. All accounts have a daily
+///                 transaction limit of 1 million NFM. Large investors can whitelist this up to 1.5 million for a fee of 10,000 NFM
+///            -    Minting: 7,600,000,000 NFM are created by minting in 8 years. 60% of the amount can only be obtained via
+///                 the staking pool. 15% is allocated to the Uniswap protocol. 5% goes to AFT Governance. 10% to the developers
+///                 and 10% to the NFM Treasury for investments to generate profits for the Bonus Event.
+///            -    Burning and Community: 7,000,000,000 NFM are destroyed by burning process starting after 4 years with a burning
+///                 fee of 2%  and a Community Fee of 2%. The burning fee will be maintained until the total amount has shrunk back to
+///                 1 billion. When this is done, the burning fee will be credited to the community. The community fee is a staking contribution.
+///                 Since the staking pool is funded by the minting protocol, which is finite. An infinite interest system is created by the
+///                 community fee, so that interest can still be generated in the stake even after minting.
 ///            -    Liquidity: extension implements Uniswapv2 Protocol and adds liquidity to different markets.
 ///            -    Swap: extension implements Uniswapv2 Protocol and exchanges the NFM for different currencies for the Liquidity extension
+///                 10% of every realized swap goes into the Bonus Event.
 ///            -    Timer: controls the timing of all extensions of the protocol
 ///            -    Bonus: allows NFM owners to receive profit distributions of the protocol in other currencies such
 ///                 as WBTC,WBNB,WETH,WMATIC,DAI,... every 100 days
-///            -    BuyBack: Buyback program will start after reaching the final total supply of 1 billion NFM. Buybacks are executed monthly
+///            -    Airdrop: allows NFM owners to receive profit distributions of the protocol in other currencies from the IDO
+///                 Launchpad or listed Airdrops from other projects... every 6 days
+///            -    LP-Redemption: Redeem the locked LP tokens step by step. 20% goes to the NFM Bonus Event. The remaining 80%
+///                 goes to NFM Treasury and AFT Governance on a 50/50 split
+///            -    Vault Interface: Makes investments in different protocols like Aave, Uniswap,... to generate additional profits for the bonus payouts.
+///            -    BuyBack: Buyback program will start after reaching the final total supply of 1 billion NFM. Buybacks are executed monthly (30 day interval)
 ///                 via the decentralized markets on UniswapV2.
 ///
+///            TOKEN USE CASE:
+///            -    The principal application of the NFM token is the creation of value. This should not only be borne by the token itself,
+///                 but also by future projects in the art, real estate and financial sectors
+///            -    We as founders have the idea of ​​creating something completely new, which not only refers to the digital values, but also
+///                 includes the physical real value.
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 contract NFM {
     //include SafeMath
@@ -684,7 +705,7 @@ contract NFM {
                         (address IBonus, ) = _Controller._getBonusBuyBack();
                         INfmExtraBonus Bonus = INfmExtraBonus(IBonus);
                         if (Bonus._returnPayoutRule() == 0) {
-                            //Made Withdraw to Stake 50%
+                            //Make Withdraw to Stake 50%
                             if (
                                 Bonus._getWithdraw(
                                     address(
@@ -742,6 +763,7 @@ contract NFM {
                             address(_Controller._getAirdrop())
                         );
                         if (Airdrop._returnPayoutCounter() == 1) {
+                            //Make Withdraw Stake/Treasury 50%/50% Airdrop 1
                             uint256 lastRound = Airdrop._showlastRounds();
                             if (
                                 Airdrop._getWithdraw(
@@ -756,6 +778,7 @@ contract NFM {
                                 tlocker = true;
                             }
                         } else if (Airdrop._returnPayoutCounter() == 2) {
+                            //Make Withdraw Stake/Treasury 50%/50% Airdrop 2
                             uint256 lastRound = Airdrop._showlastRounds();
                             if (
                                 Airdrop._getWithdraw(
@@ -770,6 +793,7 @@ contract NFM {
                                 tlocker = true;
                             }
                         } else if (Airdrop._returnPayoutCounter() == 3) {
+                            //Make Withdraw Stake/Treasury 50%/50% Airdrop 3
                             uint256 lastRound = Airdrop._showlastRounds();
                             if (
                                 Airdrop._getWithdraw(
@@ -793,7 +817,7 @@ contract NFM {
                     } else {
                         if (
                             INfmAirdrop(_Controller._getAirdrop())
-                                ._checkPayment(msg.sender) !=
+                                ._checkPayment(from) !=
                             Timer._getEndExtraBonusAirdropTime()
                         ) {
                             INfmAirdrop Airdrop = INfmAirdrop(

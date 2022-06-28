@@ -422,19 +422,30 @@ contract NFMExtraBonus {
             return false;
         } else {
             if (CoinProNFM > 0) {
-                uint256 PayAmount = _getAmountToPay(Sender);
-                _updatePayoutBalance(_CoinsArray[Index], PayAmount);
-                _wasPaidCheck[Sender] = INfmTimer(
-                    address(_Controller._getTimer())
-                )._getEndExtraBonusAllTime();
-                IERC20(address(_CoinsArray[Index])).transfer(Sender, PayAmount);
-                emit SBonus(
-                    Sender,
-                    _CoinsArray[Index],
-                    PayAmount,
-                    block.timestamp
-                );
-                return true;
+                if (
+                    _wasPaidCheck[Sender] !=
+                    INfmTimer(address(_Controller._getTimer()))
+                        ._getEndExtraBonusAllTime()
+                ) {
+                    uint256 PayAmount = _getAmountToPay(Sender);
+                    _updatePayoutBalance(_CoinsArray[Index], PayAmount);
+                    _wasPaidCheck[Sender] = INfmTimer(
+                        address(_Controller._getTimer())
+                    )._getEndExtraBonusAllTime();
+                    IERC20(address(_CoinsArray[Index])).transfer(
+                        Sender,
+                        PayAmount
+                    );
+                    emit SBonus(
+                        Sender,
+                        _CoinsArray[Index],
+                        PayAmount,
+                        block.timestamp
+                    );
+                    return true;
+                } else {
+                    return false;
+                }
             } else {
                 return false;
             }
@@ -468,26 +479,43 @@ contract NFMExtraBonus {
         uint256 amount,
         bool percent
     ) public onlyOwner returns (bool) {
-        uint256 CoinAmount = IERC20(_CoinsArray[Index]).balanceOf(
-            address(this)
-        );
-        if (percent == true) {
-            //makeCalcs on Percentatge
-            uint256 AmountToSend = SafeMath.div(
-                SafeMath.mul(CoinAmount, amount),
-                100
+        if (_CoinsArray.length > 0) {
+            uint256 CoinAmount = IERC20(_CoinsArray[Index]).balanceOf(
+                address(this)
             );
-            _updatePayoutBalance(_CoinsArray[Index], AmountToSend);
-            IERC20(address(_CoinsArray[Index])).transfer(To, AmountToSend);
-            return true;
-        } else {
-            if (amount == 0) {
-                _updatePayoutBalance(_CoinsArray[Index], CoinAmount);
-                IERC20(address(_CoinsArray[Index])).transfer(To, CoinAmount);
+            if (CoinAmount == 0) {
+                if (percent == true) {
+                    //makeCalcs on Percentatge
+                    uint256 AmountToSend = SafeMath.div(
+                        SafeMath.mul(CoinAmount, amount),
+                        100
+                    );
+                    _updatePayoutBalance(_CoinsArray[Index], AmountToSend);
+                    IERC20(address(_CoinsArray[Index])).transfer(
+                        To,
+                        AmountToSend
+                    );
+                    return true;
+                } else {
+                    if (amount == 0) {
+                        _updatePayoutBalance(_CoinsArray[Index], CoinAmount);
+                        IERC20(address(_CoinsArray[Index])).transfer(
+                            To,
+                            CoinAmount
+                        );
+                    } else {
+                        _updatePayoutBalance(_CoinsArray[Index], amount);
+                        IERC20(address(_CoinsArray[Index])).transfer(
+                            To,
+                            amount
+                        );
+                    }
+                    return true;
+                }
             } else {
-                _updatePayoutBalance(_CoinsArray[Index], amount);
-                IERC20(address(_CoinsArray[Index])).transfer(To, amount);
+                return true;
             }
+        } else {
             return true;
         }
     }
