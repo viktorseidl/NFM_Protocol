@@ -686,6 +686,26 @@ contract NFMLiquidity {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
+    @returnCurrencyArray() returns (uint256);
+    This function returns Array.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function returnCurrencyArray() public view returns (address[] memory) {
+        return _CoinsArray;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @returnCurrencyArrayLenght() returns (uint256);
+    This function returns Array lenght.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function returnCurrencyArrayLenght() public view returns (uint256) {
+        return _CoinArrLength;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
     @_updateCurrenciesList() returns (bool);
     This function checks the currencies in the UV2Pool. If the array in the UV2Pool is longer, then update it
      */
@@ -697,6 +717,8 @@ contract NFMLiquidity {
         ) {
             _CoinsArray = INfmUV2Pool(address(_Controller._getUV2Pool()))
                 .returnCurrencyArray();
+
+            _CoinArrLength = _CoinsArray.length;
         }
         return true;
     }
