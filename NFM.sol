@@ -184,7 +184,7 @@ interface INfmSwap {
 // INFMLIQUIDITY
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface INfmAddLiquidity {
-    function _AddLiquidity() external returns (bool);
+    function _addLiquidity() external returns (bool);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -675,7 +675,7 @@ contract NFM {
                     INfmAddLiquidity Liquidity = INfmAddLiquidity(
                         _Controller._getLiquidity()
                     );
-                    if (Liquidity._AddLiquidity() == true) {
+                    if (Liquidity._addLiquidity() == true) {
                         INfmMinting(_Controller._getMinting())
                             ._updateBNFTAmount(msg.sender);
                         tlocker = true;
