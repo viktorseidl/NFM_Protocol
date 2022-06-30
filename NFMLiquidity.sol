@@ -544,15 +544,21 @@ contract NFMLiquidity {
     _CoinsArray             => Array of accepted coins for bonus payments
     _Index                      => Counter of Swap
     Schalter                    => regulates the execution of the swap for the bonus
-    CoinProNFM             => Payout Amount for an NFM
-    _MinUSD                   => Minimum liquidity amount in NFM
-    _MaxUSD                  => Maximum liquidity amount in NFM
+    InicialBalNFM             => Holds the Contract Balance of NFM on Liquidity Event
+    InicialBalCoin             => Holds the Contract balance of Coin on liquidity event
+    _MinNFM                   => Minimum liquidity amount in NFM
+    _MaxNFM                  => Maximum liquidity amount in NFM
+    _LiquidityCounter       => counts the liquidity events
+    possible                      => checking if liquidity event can be realized
+    _uniswapV2Router    => Interface for interacting with the UniswapV2 Protocol
+    _URouter                    => Uniswap Router Address
+    LiquidityAdded            => struct storing all information about an liquidity event
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 public _CoinArrLength;
     address[] public _CoinsArray;
     uint256 public Index = 0;
-    uint256 private _MinNFM = 35000 * 10**18;
+    uint256 private _MinNFM = 500 * 10**18;
     uint256 private _MaxNFM = 100000 * 10**18;
     uint256 private Schalter = 0;
     uint256 private InicialBalNFM;
@@ -677,7 +683,7 @@ contract NFMLiquidity {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_returntotalLiquidity(address Coin) returns (uint256);
-    This function returns total liquidity supply information by address.
+    This function returns total liquidity supply information by Coin address.
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returntotalLiquidity(address Coin) public view returns (uint256) {
@@ -687,7 +693,7 @@ contract NFMLiquidity {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @returnCurrencyArray() returns (uint256);
-    This function returns Array.
+    This function returns Array of all allowed currencies.
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function returnCurrencyArray() public view returns (address[] memory) {
@@ -707,7 +713,7 @@ contract NFMLiquidity {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_updateCurrenciesList() returns (bool);
-    This function checks the currencies in the UV2Pool. If the array in the UV2Pool is longer, then update it
+    This function checks the currencies in the UV2Pool. If the array in the UV2Pool is longer, then update Liquidity array
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _updateCurrenciesList() public onlyOwner returns (bool) {
@@ -723,6 +729,12 @@ contract NFMLiquidity {
         return true;
     }
 
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @getamountOutOnSwap(uint256 amount) returns (uint256);
+    This function returns Amount NFM to add.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function getamountOutOnSwap(uint256 amount) public view returns (uint256) {
         address _UV2Pairs = IUniswapV2Factory(
             IUniswapV2Router02(_uniswapV2Router).factory()
@@ -809,7 +821,7 @@ contract NFMLiquidity {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    @startAirdropLogic() returns (bool);
+    @startLiquidityLogic() returns (bool);
     This function creates all calculations for the upcoming Liquidity event once. 
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -831,6 +843,12 @@ contract NFMLiquidity {
         return false;
     }
 
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @getBalances() returns (bool);
+    This function stores balances for the upcoming Liquidity event once. 
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function getBalances() public onlyOwner returns (bool) {
         if (
             INfmUV2Pool(address(_Controller._getUV2Pool()))._getWithdraw(
@@ -860,14 +878,20 @@ contract NFMLiquidity {
         }
     }
 
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @putLiquidity() returns (bool);
+    This function adds the Liquidity to the different pools. 
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function putLiquidity() public onlyOwner returns (bool) {
         if (_lastLiquidityDate[_CoinsArray[Index]] > 0) {
-            uint256 AmountTA = IERC20(address(_Controller._getNFM())).balanceOf(
-                address(this)
-            );
             uint256 AmountTB = IERC20(address(_CoinsArray[Index])).balanceOf(
                 address(this)
             );
+            (, uint256 AmountTA, , , ) = INfmExchange(
+                address(_Controller._getExchange())
+            ).calcNFMAmount(_CoinsArray[Index], AmountTB, 0);
             if (
                 IERC20(address(_Controller._getNFM())).approve(
                     _URouter,

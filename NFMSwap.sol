@@ -506,8 +506,11 @@ contract NFMSwap {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 public _CoinArrLength;
     address[] public _CoinsArray;
-    uint256 public _SwapCounter;
+    uint256 public Index = 0;
+    uint256 private _MinNFM = 35000 * 10**18;
+    uint256 private _MaxNFM = 100000 * 10**18;
     uint256 private _SwapingCounter = 0;
+    uint256 private Schalter = 0;
     struct Exchanges {
         uint256 AmountA;
         uint256 AmountB;
@@ -521,6 +524,7 @@ contract NFMSwap {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     mapping(uint256 => Exchanges) public _RealizedSwaps;
+    mapping(address => uint256) public _RealizedTotalAmounts;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     CONTRACT EVENTS

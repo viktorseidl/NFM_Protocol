@@ -1,5 +1,6 @@
 //SPDX-License-Identifier:MIT
 pragma solidity ^0.8.13;
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // LIBRARIES
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -72,6 +73,7 @@ library SafeMath {
         return a % b;
     }
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // INTERFACES
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -92,6 +94,7 @@ interface INfmController {
 
     function _getDistribute() external pure returns (address);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // IERC20
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -123,6 +126,7 @@ interface IERC20 {
         uint256 amount
     ) external returns (bool);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // IUNISWAPV2ROUTER01
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -257,6 +261,7 @@ interface IUniswapV2Router01 {
         view
         returns (uint256[] memory amounts);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // IUNISWAPV2ROUTER02
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -306,6 +311,7 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
         uint256 deadline
     ) external;
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // IUNISWAPV2PAIR
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -331,6 +337,7 @@ interface IUniswapV2Pair {
 
     function kLast() external view returns (uint256);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // IUNISWAPV2FACTORY
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -348,7 +355,7 @@ interface IUniswapV2Factory {
 /// @dev This DEX is based on the ERC20 standard
 ///            INFO:
 ///            In order for this contract to function smoothly, it is necessary to integrate the following interfaces:
-///            
+///
 ///             -   Controller
 ///             -   IERC20
 ///             -   UniswapV2Router01
@@ -357,7 +364,7 @@ interface IUniswapV2Factory {
 ///             -   UniswapV2Factory
 ///
 ///             PARTICULARITIES:
-///             -   Dex allows 2 modes: 
+///             -   Dex allows 2 modes:
 ///                     - Fixed price sale (Presale mode)
 ///                     - Dynamic sale (Price changes based on the markets)
 ///             -   Any number of currencies can be added to the exchange. As long as these currencies have the ERC20 standard
@@ -368,18 +375,18 @@ interface IUniswapV2Factory {
 ///             -   PreSale mode enables:
 ///                     - Fixed Sale Price
 ///                     - Fixed supply
-///                     - Minimum purchase amount 
-///                     - Maximum purchase amount 
+///                     - Minimum purchase amount
+///                     - Maximum purchase amount
 ///                     - Time limit
 ///                     - Trade free of charge
 ///                     - Free from price manipulations
 ///             -   Dynamic mode enables:
 ///                     - Fixed supply
-///                     - Minimum purchase amount 
-///                     - Maximum purchase amount 
+///                     - Minimum purchase amount
+///                     - Maximum purchase amount
 ///                     - Free from price manipulations
 ///                     - Trade free of charge
-///             -   By exchanging currencies, an integrated onchain oracle in the contract is filled with prices. This oracle can later be used 
+///             -   By exchanging currencies, an integrated onchain oracle in the contract is filled with prices. This oracle can later be used
 ///                 for other interfaces to avoid price manipulations.
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 contract NFMExchange {
@@ -390,7 +397,7 @@ contract NFMExchange {
     CONTROLLER
     OWNER = MSG.SENDER ownership will be handed over to dao
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     INfmController private _Controller;
     address private _SController;
     address private _Owner;
@@ -410,7 +417,7 @@ contract NFMExchange {
     _MinUSD                         => Minimum trade amount in USD
     _MaxUSD                        => Maximum trade amount in USD
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     bool private _isFixedPrice = false;
     uint256 private _PriceVsUSD;
     uint256 private _OracleTimer;
@@ -423,15 +430,15 @@ contract NFMExchange {
     address private _USDC;
     address private _uniswapV2Router =
         0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
-    uint256 private _MinUSD;
-    uint256 private _MaxUSD;
+    uint256 private _MinUSD = 10 * 10**18;
+    uint256 private _MaxUSD = 200000 * 10**18;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     MAPPINGS
     _isCurrencyAllowed (Currency address, true if allowed false if not allowed);
     _Oracle (Currency address, price in USD);
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     mapping(address => bool) public _isCurrencyAllowed;
     mapping(address => uint256[]) public _Oracle;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -439,7 +446,7 @@ contract NFMExchange {
     CONTRACT EVENTS
     Trade(Buyer address, Coin address, Currency amount, NFM amount, Timestamp);
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     event Trade(
         address indexed Sender,
         address indexed Coin,
@@ -452,7 +459,7 @@ contract NFMExchange {
     MODIFIER
     onlyOwner       => Only Controller listed Contracts and Owner can interact with this contract.
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     modifier onlyOwner() {
         require(
             _Controller._checkWLSC(_SController, msg.sender) == true ||
@@ -474,13 +481,14 @@ contract NFMExchange {
         _isCurrencyAllowed[USDC] = true;
         _OracleTimer = block.timestamp + 3600;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @setFixedPrice(uint256 FixedUSDPrice, bool OnOff) returns (bool);
     This function enables the fixed price mode
     USD Price against NFM needs to be in 18 digits format 
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function setFixedPrice(uint256 FixedUSDPrice, bool OnOff)
         public
         onlyOwner
@@ -490,22 +498,24 @@ contract NFMExchange {
         _PriceVsUSD = FixedUSDPrice;
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @returnAllowedCurrencies(address Coin) returns (bool);
     This function is for checking a currency if it is eligible for trading
     Returns true if Currency is allowed 
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function returnAllowedCurrencies(address Coin) public view returns (bool) {
         return _isCurrencyAllowed[Coin];
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @returnCurrenciesArray() returns (address);
     This function returns a list of all currencies.
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function returnCurrenciesArray()
         public
         view
@@ -513,12 +523,13 @@ contract NFMExchange {
     {
         return _CurrencyArray;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @onOffPresale(bool Mode, uint256 DaysStart, uint256 DaysEnd, uint256 PresaleAmount) returns (bool);
     This function allows you to activate and deactivate the presale mode
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function onOffPresale(
         bool Mode,
         uint256 DaysStart,
@@ -528,7 +539,8 @@ contract NFMExchange {
             _PreSaleMode = Mode;
             _PreSaleStart = block.timestamp + (3600 * 24 * DaysStart);
             _PreSaleEnd = block.timestamp + (3600 * 24 * (DaysEnd + DaysStart));
-            _PreSaleDexAmount = IERC20(address(_Controller._getNFM())).balanceOf(address(this));
+            _PreSaleDexAmount = IERC20(address(_Controller._getNFM()))
+                .balanceOf(address(this));
         } else {
             _PreSaleMode = Mode;
             _PreSaleStart = 0;
@@ -543,7 +555,7 @@ contract NFMExchange {
     @returnRemainPresaleAmount() returns (uint256, bool);
     This function returns the remaining presale amount.
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function returnRemainPresaleAmount() public view returns (uint256, bool) {
         if (_PreSaleMode == true) {
             return (
@@ -560,7 +572,7 @@ contract NFMExchange {
     @returnInicialandSold() returns (uint256, uint256, bool);
     This function returns the inicial presale amount and and the amount sold.
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function returnInicialandSold()
         public
         view
@@ -598,7 +610,7 @@ contract NFMExchange {
     @returnPresaleTimers() returns (uint256, uint256, bool);
     This function returns the timestamp of the presale
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function returnPresaleTimers()
         public
         view
@@ -614,13 +626,14 @@ contract NFMExchange {
             return (_PreSaleStart, _PreSaleEnd, true);
         }
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @setMinMaxUSD(uint256 Min, uint256 Max) returns (bool);
     This function sets the minimum and maximum amount for trading
     Amounts must be specified in USD and in 18 digit format
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function setMinMaxUSD(uint256 Min, uint256 Max)
         public
         onlyOwner
@@ -630,6 +643,7 @@ contract NFMExchange {
         _MaxUSD = Max;
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @addOrDisableCoin(address Coin, bool Allow) returns (bool);
@@ -637,7 +651,7 @@ contract NFMExchange {
     Add new Currency => Coin Address, true
     Deactivate Currency => Coin Address, false
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function addOrDisableCoin(address Coin, bool Allow)
         public
         onlyOwner
@@ -652,13 +666,14 @@ contract NFMExchange {
         }
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @updateSetFixedPrice() returns (bool);
     This function updates the fixed price if the dynamic price mode is activated.
     This mode should only be used if all 3 oracles exist. The NFM/USDC pair must exist on Uniswap oracle before it can be used.
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function updateSetFixedPrice() internal onlyOwner returns (bool) {
         uint256 O2Price = checkOracle2Price(address(_Controller._getNFM()));
         uint256 MinPus = SafeMath.sub(
@@ -680,13 +695,14 @@ contract NFMExchange {
         }
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @checkOracle1Price(address Coin) returns (uint256);
     This function checks the current price of the integrated onChain Oracle.
     The return value is a USD price in 18 digit format
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function checkOracle1Price(address Coin) public view returns (uint256) {
         uint256 Prounds = _Oracle[Coin].length;
         uint256 RoundCount = 0;
@@ -706,13 +722,14 @@ contract NFMExchange {
 
         return sum;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @checkOracle2Price(address Coin) returns (uint256);
     This function checks the current price of the UniswapV2 Oracle.
     The return value is a USD price in 18 digit format
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function checkOracle2Price(address Coin) public view returns (uint256) {
         address UniPair = IUniswapV2Factory(
             IUniswapV2Router02(address(_uniswapV2Router)).factory()
@@ -730,13 +747,14 @@ contract NFMExchange {
             return 0;
         }
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @setPriceOracle(address Coin, uint256[] memory Price) returns (bool);
     This function adds new prices to the onChain Oracle.
     The prices are saved as USD prices and in 18 digit format
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function setPriceOracle(address Coin, uint256[] memory Price)
         public
         onlyOwner
@@ -749,6 +767,7 @@ contract NFMExchange {
         }
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @calcNFMAmount(address Coin,uint256 amount,uint256 offchainOracle) returns (bool,uint256,uint256,bool,bool);
@@ -757,7 +776,7 @@ contract NFMExchange {
     The offchain oracle price must be passed in 6 digit format (Example 125,25 US$ => 125250000 US$). If the price of the offchain 
     oracle is 0, the median price is automatically determined
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function calcNFMAmount(
         address Coin,
         uint256 amount,
@@ -834,6 +853,7 @@ contract NFMExchange {
         return (true, NFMs, median, MaxVal, MinVal);
         ///NOW TRANSFER
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @SwapCoinVsNFM(address Coin, uint256 amount, uint256 offchainOracle) returns (bool);
@@ -843,7 +863,7 @@ contract NFMExchange {
     oracle is 0, the median price is automatically determined
                 ***Before this function can be executed. Buyer must approve the amount to be exchanged to this contract.***
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function SwapCoinVsNFM(
         address Coin,
         uint256 amount,
@@ -902,6 +922,7 @@ contract NFMExchange {
         emit Trade(msg.sender, Coin, amount, NFMsAmount, block.timestamp);
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @withdraw(address Coin, address To, uint256 amount, bool percent) returns (bool);
@@ -911,7 +932,7 @@ contract NFMExchange {
     Total Amount     =>   Address Coin, Address Receiver, 0, false
     A percentage     =>   Address Coin, Address Receiver, percentage, true
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function withdraw(
         address Coin,
         address To,
