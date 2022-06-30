@@ -707,8 +707,8 @@ contract NFMExchange {
         uint256 Prounds = _Oracle[Coin].length;
         uint256 RoundCount = 0;
         uint256 sum = 0;
-        if (Prounds > 30) {
-            for (uint256 i = Prounds - 30; i < Prounds; i++) {
+        if (Prounds > 10) {
+            for (uint256 i = Prounds - 10; i < Prounds; i++) {
                 sum += _Oracle[Coin][i];
                 RoundCount++;
             }

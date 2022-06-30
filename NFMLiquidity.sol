@@ -987,6 +987,12 @@ contract NFMLiquidity {
         }
     }
 
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @returnfunds() returns (bool);
+    This function sends the remaining credits back to the UV2Pool.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function returnfunds() public onlyOwner returns (bool) {
         uint256 AmountTA = IERC20(address(_Controller._getNFM())).balanceOf(
             address(this)
@@ -1016,6 +1022,12 @@ contract NFMLiquidity {
         return true;
     }
 
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @updateNext() returns (bool);
+    This function updates the timer.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function updateNext() public onlyOwner returns (bool) {
         if (
             INfmTimer(address(_Controller._getTimer()))
@@ -1029,9 +1041,8 @@ contract NFMLiquidity {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    @firstLiquidity() returns (uint256,bool);
-    This function is executed once at the beginning if the pair was not initiated. it calculates whether a liquidity supply is possible 
-    and amounts to add.
+    @_addLiquidity() returns (bool);
+    This function is responsible for executing the logic in several steps. This is intended to reduce the gas fees per transaction.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _addLiquidity() public virtual onlyOwner returns (bool) {
