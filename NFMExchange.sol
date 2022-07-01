@@ -96,6 +96,15 @@ interface INfmController {
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// INFMORACLE
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+interface INfmOracle {
+    function _getLatestPrice(address coin) external view returns (uint256);
+
+    function _addtoOracle(address Coin, uint256 Price) external returns (bool);
+}
+
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // IERC20
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface IERC20 {
@@ -428,6 +437,7 @@ contract NFMExchange {
     uint256 private _CurrencyCounter;
     address[] private _CurrencyArray;
     address private _USDC;
+    address private _OracleAdr;
     address private _uniswapV2Router =
         0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     uint256 private _MinUSD = 10 * 10**18;
@@ -470,7 +480,11 @@ contract NFMExchange {
         _;
     }
 
-    constructor(address Controller, address USDC) {
+    constructor(
+        address Controller,
+        address USDC,
+        address OracleAdr
+    ) {
         _Owner = msg.sender;
         INfmController _Cont = INfmController(address(Controller));
         _SController = Controller;
@@ -480,6 +494,7 @@ contract NFMExchange {
         _CurrencyCounter++;
         _isCurrencyAllowed[USDC] = true;
         _OracleTimer = block.timestamp + 3600;
+        _OracleAdr = OracleAdr;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -870,6 +885,10 @@ contract NFMExchange {
         uint256 offchainOracle
     ) public returns (bool) {
         require(_isCurrencyAllowed[Coin] == true, "!C");
+        uint256 latestprice = INfmOracle(_OracleAdr)._getLatestPrice(Coin);
+        if (latestprice > 0) {
+            offchainOracle = SafeMath.div(offchainOracle + latestprice, 2);
+        }
         if (_PreSaleMode == true) {
             require(
                 _PreSaleStart < block.timestamp &&

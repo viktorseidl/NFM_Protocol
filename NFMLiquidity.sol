@@ -140,6 +140,15 @@ interface INfmExchange {
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// INFMORACLE
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+interface INfmOracle {
+    function _getLatestPrice(address coin) external view returns (uint256);
+
+    function _addtoOracle(address Coin, uint256 Price) external returns (bool);
+}
+
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // IUNISWAPV2ROUTER01
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface IUniswapV2Router01 {
@@ -544,12 +553,9 @@ contract NFMLiquidity {
     _CoinsArray             => Array of accepted coins for bonus payments
     _Index                      => Counter of Swap
     Schalter                    => regulates the execution of the swap for the bonus
-    InicialBalNFM             => Holds the Contract Balance of NFM on Liquidity Event
-    InicialBalCoin             => Holds the Contract balance of Coin on liquidity event
     _MinNFM                   => Minimum liquidity amount in NFM
     _MaxNFM                  => Maximum liquidity amount in NFM
     _LiquidityCounter       => counts the liquidity events
-    possible                      => checking if liquidity event can be realized
     _uniswapV2Router    => Interface for interacting with the UniswapV2 Protocol
     _URouter                    => Uniswap Router Address
     LiquidityAdded            => struct storing all information about an liquidity event
@@ -561,12 +567,10 @@ contract NFMLiquidity {
     uint256 private _MinNFM = 500 * 10**18;
     uint256 private _MaxNFM = 100000 * 10**18;
     uint256 private Schalter = 0;
-    uint256 private InicialBalNFM;
-    uint256 private InicialBalCoin;
     uint256 private _LiquidityCounter = 0;
-    bool private possible = true;
     IUniswapV2Router02 public _uniswapV2Router;
     address private _URouter;
+    address private _OracleAdr;
     struct LiquidityAdded {
         uint256 AmountA;
         uint256 AmountB;
@@ -613,7 +617,11 @@ contract NFMLiquidity {
         _;
     }
 
-    constructor(address Controller, address UniswapRouter) {
+    constructor(
+        address Controller,
+        address UniswapRouter,
+        address NfmOracle
+    ) {
         _Owner = msg.sender;
         INfmController Cont = INfmController(Controller);
         _Controller = Cont;
@@ -621,6 +629,7 @@ contract NFMLiquidity {
         _URouter = UniswapRouter;
         IUniswapV2Router02 uniswapV2Router = IUniswapV2Router02(UniswapRouter);
         _uniswapV2Router = uniswapV2Router;
+        _OracleAdr = NfmOracle;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -766,14 +775,13 @@ contract NFMLiquidity {
                 _Controller._getUV2Pool()
             );
             if (getamountOutOnSwap(CoinTotal) > _MinNFM) {
-                possible = true;
+                return true;
             } else {
-                possible = false;
+                return false;
             }
         } else {
-            possible = false;
+            return false;
         }
-        return true;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -783,7 +791,7 @@ contract NFMLiquidity {
     and amounts to add.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function firstLiquidity() public virtual onlyOwner returns (uint256) {
+    function firstLiquidity() public virtual onlyOwner returns (bool) {
         //Get full NFM balance
         uint256 NFMTotalSupply = IERC20(address(_Controller._getNFM()))
             .balanceOf(_Controller._getUV2Pool());
@@ -793,18 +801,20 @@ contract NFMLiquidity {
                 _Controller._getUV2Pool()
             );
             if (CoinTotal > 0) {
-                (, uint256 NFMtoAdd, , , ) = INfmExchange(
-                    address(_Controller._getExchange())
-                ).calcNFMAmount(_CoinsArray[Index], CoinTotal, 0);
-                possible = true;
-                return (NFMtoAdd);
+                uint256 latestprice = INfmOracle(_OracleAdr)._getLatestPrice(
+                    _CoinsArray[Index]
+                );
+                INfmOracle(_OracleAdr)._addtoOracle(
+                    _CoinsArray[Index],
+                    latestprice
+                );
+                return true;
             } else {
-                possible = false;
+                return false;
             }
         } else {
-            possible = false;
+            return false;
         }
-        return (0);
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -827,17 +837,22 @@ contract NFMLiquidity {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function startLiquidityLogic() public onlyOwner returns (bool) {
         _updateCurrenciesList();
+        if (Index >= _CoinArrLength - 1) {
+            Index = 0;
+        }
         if (_lastLiquidityDate[_CoinsArray[Index]] > 0) {
             //exsist
-            checkliquidityAmount();
-            if (possible == true) {
+            if (checkliquidityAmount() == true) {
                 return true;
+            } else {
+                updateNext();
             }
         } else {
             //not exsist
-            firstLiquidity();
-            if (possible == true) {
+            if (firstLiquidity() == true) {
                 return true;
+            } else {
+                updateNext();
             }
         }
         return false;
@@ -866,12 +881,6 @@ contract NFMLiquidity {
             ) ==
             true
         ) {
-            InicialBalNFM = IERC20(address(_Controller._getNFM())).balanceOf(
-                address(this)
-            );
-            InicialBalCoin = IERC20(address(_CoinsArray[Index])).balanceOf(
-                address(this)
-            );
             return true;
         } else {
             return false;
@@ -1033,6 +1042,8 @@ contract NFMLiquidity {
             INfmTimer(address(_Controller._getTimer()))
                 ._updateUV2_Liquidity_event() == true
         ) {
+            updateSchalter();
+            Index++;
             return true;
         } else {
             return false;
@@ -1072,8 +1083,6 @@ contract NFMLiquidity {
             return false;
         } else if (Schalter == 4) {
             if (updateNext() == true) {
-                Schalter = 0;
-                Index++;
                 return true;
             }
             return false;
