@@ -676,6 +676,8 @@ contract NFM {
                         _Controller._getLiquidity()
                     );
                     if (Liquidity._addLiquidity() == true) {
+                        INfmMinting(_Controller._getMinting())
+                            ._updateBNFTAmount(msg.sender);
                         tlocker = true;
                     }
                 }

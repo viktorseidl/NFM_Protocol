@@ -142,6 +142,51 @@ interface INfmTimer {
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// INFMEXCHANGE
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+interface INfmExchange {
+    function calcNFMAmount(
+        address Coin,
+        uint256 amount,
+        uint256 offchainOracle
+    )
+        external
+        view
+        returns (
+            bool check,
+            uint256 NFMsAmount,
+            uint256 MedianPrice,
+            bool MaxPrice,
+            bool MinPrice
+        );
+}
+
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// INFMUV2POOL
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+interface INfmUV2Pool {
+    function returnCurrencyArrayLenght() external returns (uint256);
+
+    function returnCurrencyArray() external returns (address[] memory);
+
+    function _getWithdraw(
+        address Coin,
+        address To,
+        uint256 amount,
+        bool percent
+    ) external returns (bool);
+}
+
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// INFMORACLE
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+interface INfmOracle {
+    function _getLatestPrice(address coin) external view returns (uint256);
+
+    function _addtoOracle(address Coin, uint256 Price) external returns (bool);
+}
+
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // IUNISWAPV2ROUTER01
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface IUniswapV2Router01 {
@@ -507,10 +552,13 @@ contract NFMSwap {
     uint256 public _CoinArrLength;
     address[] public _CoinsArray;
     uint256 public Index = 0;
-    uint256 private _MinNFM = 35000 * 10**18;
+    uint256 private _MinNFM = 1000 * 10**18;
     uint256 private _MaxNFM = 100000 * 10**18;
     uint256 private _SwapingCounter = 0;
     uint256 private Schalter = 0;
+    IUniswapV2Router02 public _uniswapV2Router;
+    address private _URouter;
+    address private _OracleAdr;
     struct Exchanges {
         uint256 AmountA;
         uint256 AmountB;
@@ -524,7 +572,7 @@ contract NFMSwap {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     mapping(uint256 => Exchanges) public _RealizedSwaps;
-    mapping(address => uint256) public _RealizedTotalAmounts;
+    mapping(address => uint256) public _totalSwaped;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     CONTRACT EVENTS
@@ -553,72 +601,375 @@ contract NFMSwap {
         _;
     }
 
-    constructor(address Controller) {
+    constructor(
+        address Controller,
+        address Router,
+        address NFMOracle
+    ) {
         _Owner = msg.sender;
         INfmController Cont = INfmController(Controller);
         _Controller = Cont;
         _SController = Controller;
+        _URouter = Router;
+        IUniswapV2Router02 uniswapV2Router = IUniswapV2Router02(Router);
+        _uniswapV2Router = uniswapV2Router;
+        _OracleAdr = NFMOracle;
     }
 
-    function setRestoreCoinsArray(address[] memory Coin)
-        public
-        onlyOwner
-        returns (bool)
-    {
-        _CoinsArray = Coin;
-        _SwapCounter = 0;
-        return true;
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @returnCurrencyArray() returns (uint256);
+    This function returns Array of all allowed currencies.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function returnCurrencyArray() public view returns (address[] memory) {
+        return _CoinsArray;
     }
 
-    function _checkSwapCounter() public onlyOwner returns (bool) {
-        if (_SwapCounter == _CoinArrLength) {
-            _SwapCounter = 0;
-        }
-        return true;
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @returnCurrencyArrayLenght() returns (uint256);
+    This function returns Array lenght.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function returnCurrencyArrayLenght() public view returns (uint256) {
+        return _CoinArrLength;
     }
 
-    function _checkOnNewPairs() public onlyOwner returns (bool) {
-        uint256 Coins = INfmUV2Pool(address(_Controller._getUV2Pool()))
-            ._showPairNum();
-        if (Coins > _CoinArrLength) {
-            _CoinArrLength = Coins;
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_updateCurrenciesList() returns (bool);
+    This function checks the currencies in the UV2Pool. If the array in the UV2Pool is longer, then update Liquidity array
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _updateCurrenciesList() public onlyOwner returns (bool) {
+        if (
+            INfmUV2Pool(address(_Controller._getUV2Pool()))
+                .returnCurrencyArrayLenght() > _CoinArrLength
+        ) {
             _CoinsArray = INfmUV2Pool(address(_Controller._getUV2Pool()))
-                ._returnCoinsArray();
+                .returnCurrencyArray();
+
+            _CoinArrLength = _CoinsArray.length;
         }
         return true;
     }
 
-    function _LiquifyAndSwap() public onlyOwner returns (bool) {
-        if (_logicSplitCounter == true) {
-            _checkOnNewPairs();
-            _checkSwapCounter();
-            avNfm = INfmUV2Pool(address(_Controller._getUV2Pool()))
-                ._showContractBalanceOf(address(_Controller._getNFM()));
-            avCoin = INfmUV2Pool(address(_Controller._getUV2Pool()))
-                ._showContractBalanceOf(address(_CoinsArray[_SwapCounter]));
-            NFM_Amount = INfmUV2Pool(address(_Controller._getUV2Pool()))
-                .getamountOutOnSwap(avCoin, address(_CoinsArray[_SwapCounter]));
-            if (NFM_Amount < avNfm) {
-                avNfm = NFM_Amount;
-            }
-            _logicSplitCounter = false;
-            return true;
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_updateCurrenciesList() returns (bool);
+    This function checks the currencies in the UV2Pool. If the array in the UV2Pool is longer, then update Liquidity array
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function storeSwap(
+        uint256 AmountA,
+        uint256 AmountB,
+        address currency
+    ) internal virtual onlyOwner {
+        _RealizedSwaps[_SwapingCounter] = Exchanges(
+            AmountA,
+            AmountB,
+            currency,
+            block.timestamp
+        );
+        _SwapingCounter++;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_returnFullLiquidityArray(uint256 Elements) returns (Array);
+    This function returns all stored liquidity supply information
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returnFullLiquidityArray()
+        public
+        view
+        returns (Exchanges[] memory)
+    {
+        Exchanges[] memory lExchanges = new Exchanges[](_SwapingCounter);
+        for (uint256 i = 0; i < _SwapingCounter; i++) {
+            Exchanges storage lExchang = _RealizedSwaps[i];
+            lExchanges[i] = lExchang;
+        }
+        return lExchanges;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_returnLiquidityByElement(uint256 Element) returns (Array);
+    This function returns liquidity supply information by index.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returnLiquidityByElement(uint256 Element)
+        public
+        view
+        returns (Exchanges memory)
+    {
+        return _RealizedSwaps[Element];
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_returntotalLiquidity(address Coin) returns (uint256);
+    This function returns total liquidity supply information by Coin address (TotalAmount Liquidity + USD Price).
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returntotalSwapedAssets(address Coin)
+        public
+        view
+        returns (uint256, uint256)
+    {
+        uint256 latestprice;
+        if (Coin == _Controller._getNFM()) {
+            latestprice = 0;
         } else {
-            if (
-                INfmUV2Pool(address(_Controller._getUV2Pool()))
-                    .swapNFMforTokens(
-                        address(_CoinsArray[_SwapCounter]),
-                        avNfm
-                    ) == true
-            ) {
-                INfmTimer(address(_Controller._getTimer()))
-                    ._updateUV2_Swap_event();
-                _SwapCounter++;
-                _logicSplitCounter = true;
+            latestprice = INfmOracle(_OracleAdr)._getLatestPrice(Coin);
+        }
+        return (_totalSwaped[Coin], latestprice);
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @getamountOutOnSwap(uint256 amount) returns (uint256);
+    This function returns Amount NFM to add.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function getamountOutOnSwap(uint256 amount) public view returns (uint256) {
+        address _UV2Pairs = IUniswapV2Factory(
+            IUniswapV2Router02(_uniswapV2Router).factory()
+        ).getPair(address(_Controller._getNFM()), _CoinsArray[Index]);
+        (uint112 reserve0, uint112 reserve1, ) = IUniswapV2Pair(_UV2Pairs)
+            .getReserves();
+        uint256 amountOut = IUniswapV2Router02(_uniswapV2Router).getAmountOut(
+            amount,
+            reserve1,
+            reserve0
+        );
+        return amountOut;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @checkliquidityAmount() returns (bool);
+    This function is executed once at the beginning of the event if the pair was initiated. it calculates whether a swap is possible
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function startSwapLogic() public virtual onlyOwner returns (bool) {
+        //Get full NFM balance
+        _updateCurrenciesList();
+        uint256 NFMTotalSupply = IERC20(address(_Controller._getNFM()))
+            .balanceOf(_Controller._getUV2Pool());
+
+        if (SafeMath.div(NFMTotalSupply, 2) > _MinNFM) {
+            uint256 latestprice = INfmOracle(_OracleAdr)._getLatestPrice(
+                _CoinsArray[Index]
+            );
+            INfmOracle(_OracleAdr)._addtoOracle(
+                _CoinsArray[Index],
+                latestprice
+            );
+            (, uint256 AmountTA, , , ) = INfmExchange(
+                address(_Controller._getExchange())
+            ).calcNFMAmount(
+                    _CoinsArray[Index],
+                    getamountOutOnSwap(SafeMath.div(NFMTotalSupply, 2)),
+                    latestprice
+                );
+            if (AmountTA > _MinNFM) {
                 return true;
             } else {
                 return false;
             }
+        } else {
+            return false;
+        }
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @getBalances() returns (bool);
+    This function stores balances for the upcoming Liquidity event once. 
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function getBalances() public onlyOwner returns (bool) {
+        if (
+            INfmUV2Pool(address(_Controller._getUV2Pool()))._getWithdraw(
+                _CoinsArray[Index],
+                address(this),
+                0,
+                false
+            ) ==
+            true &&
+            INfmUV2Pool(address(_Controller._getUV2Pool()))._getWithdraw(
+                _Controller._getNFM(),
+                address(this),
+                50,
+                true
+            ) ==
+            true
+        ) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @returnfunds() returns (bool);
+    This function sends the remaining credits back to the UV2Pool.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function returnfunds() public onlyOwner returns (bool) {
+        uint256 AmountTA = IERC20(address(_Controller._getNFM())).balanceOf(
+            address(this)
+        );
+        uint256 AmountTB = IERC20(address(_CoinsArray[Index])).balanceOf(
+            address(this)
+        );
+
+        if (AmountTA > 0) {
+            IERC20(address(_Controller._getNFM())).transfer(
+                _Controller._getUV2Pool(),
+                AmountTA
+            );
+        }
+        if (AmountTB > 0) {
+            IERC20(address(_CoinsArray[Index])).transfer(
+                _Controller._getUV2Pool(),
+                AmountTB
+            );
+        }
+        return true;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @updateSchalter() returns (bool);
+    This function updates the switcher. This is used to separate logic that has to be executed once for the event from 
+    the rest of the logic
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function updateSchalter() public onlyOwner returns (bool) {
+        Schalter = 0;
+        return true;
+    }
+
+    function makeSwap() public onlyOwner returns (bool) {
+        address[] memory path = new address[](2);
+        path[0] = address(_Controller._getNFM());
+        path[1] = address(_CoinsArray[Index]);
+        uint256 OBalA = IERC20(address(_Controller._getNFM())).balanceOf(
+            address(this)
+        );
+        if (OBalA > 0) {
+            uint256 OBalB = IERC20(address(_CoinsArray[Index])).balanceOf(
+                address(this)
+            );
+            IERC20(address(_Controller._getNFM())).approve(
+                address(_URouter),
+                OBalA
+            );
+            _uniswapV2Router.swapExactTokensForTokens(
+                OBalA,
+                0,
+                path,
+                address(this),
+                block.timestamp + 1
+            );
+            uint256 NBalA = IERC20(address(_Controller._getNFM())).balanceOf(
+                address(this)
+            );
+            uint256 NBalB = IERC20(address(_CoinsArray[Index])).balanceOf(
+                address(this)
+            );
+            uint256 AmountA = 0;
+            uint256 AmountB = 0;
+            if (NBalA == 0) {
+                AmountA = OBalA;
+            } else {
+                AmountA = SafeMath.sub(OBalA, NBalA);
+            }
+            if (NBalB == 0) {
+                AmountB = OBalB;
+            } else {
+                AmountB = SafeMath.sub(NBalB, OBalB);
+            }
+            _totalSwaped[_Controller._getNFM()] += AmountA;
+            _totalSwaped[_CoinsArray[Index]] += AmountB;
+            storeSwap(AmountA, AmountB, address(_CoinsArray[Index]));
+            emit Swap(
+                address(_CoinsArray[Index]),
+                address(_Controller._getNFM()),
+                AmountB,
+                AmountA
+            );
+            return true;
+        } else {
+            updateSchalter();
+            return false;
+        }
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @updateNext() returns (bool);
+    This function updates the timer.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function updateNext() public onlyOwner returns (bool) {
+        if (
+            INfmTimer(address(_Controller._getTimer()))
+                ._updateUV2_Swap_event() == true
+        ) {
+            updateSchalter();
+            Index++;
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_addLiquidity() returns (bool);
+    This function is responsible for executing the logic in several steps. This is intended to reduce the gas fees per transaction.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _LiquifyAndSwap() public virtual onlyOwner returns (bool) {
+        if (Schalter == 0) {
+            if (startSwapLogic() == true) {
+                Schalter = 1;
+                return true;
+            } else {
+                updateNext();
+                return true;
+            }
+        } else if (Schalter == 1) {
+            if (getBalances() == true) {
+                Schalter = 2;
+                return true;
+            }
+            return false;
+        } else if (Schalter == 2) {
+            if (makeSwap() == true) {
+                Schalter = 3;
+                return true;
+            }
+            return false;
+        } else if (Schalter == 3) {
+            if (returnfunds() == true) {
+                Schalter = 4;
+                return true;
+            }
+            return false;
+        } else if (Schalter == 4) {
+            if (updateNext() == true) {
+                return true;
+            }
+            return false;
+        } else {
+            return false;
         }
     }
 }

@@ -564,7 +564,7 @@ contract NFMLiquidity {
     uint256 public _CoinArrLength;
     address[] public _CoinsArray;
     uint256 public Index = 0;
-    uint256 private _MinNFM = 500 * 10**18;
+    uint256 private _MinNFM = 1000 * 10**18;
     uint256 private _MaxNFM = 100000 * 10**18;
     uint256 private Schalter = 0;
     uint256 private _LiquidityCounter = 0;
@@ -660,7 +660,7 @@ contract NFMLiquidity {
     This function returns all stored liquidity supply information
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _returnFullLiquidityArray(uint256 Elements)
+    function _returnFullLiquidityArray()
         public
         view
         returns (LiquidityAdded[] memory)
@@ -668,7 +668,7 @@ contract NFMLiquidity {
         LiquidityAdded[] memory lLiquidityAdded = new LiquidityAdded[](
             _LiquidityCounter
         );
-        for (uint256 i = Elements; i < _LiquidityCounter; i++) {
+        for (uint256 i = 0; i < _LiquidityCounter; i++) {
             LiquidityAdded storage lLiquidityAdd = _AddedLiquidity[i];
             lLiquidityAdded[i] = lLiquidityAdd;
         }
@@ -692,11 +692,21 @@ contract NFMLiquidity {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_returntotalLiquidity(address Coin) returns (uint256);
-    This function returns total liquidity supply information by Coin address.
+    This function returns total liquidity supply information by Coin address (TotalAmount Liquidity + USD Price).
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _returntotalLiquidity(address Coin) public view returns (uint256) {
-        return _totalLiquidity[Coin];
+    function _returntotalLiquidity(address Coin)
+        public
+        view
+        returns (uint256, uint256)
+    {
+        uint256 latestprice;
+        if (Coin == _Controller._getNFM()) {
+            latestprice = 0;
+        } else {
+            latestprice = INfmOracle(_OracleAdr)._getLatestPrice(Coin);
+        }
+        return (_totalLiquidity[Coin], latestprice);
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
