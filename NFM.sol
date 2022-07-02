@@ -749,6 +749,7 @@ contract NFM {
                         (address IBonus, ) = _Controller._getBonusBuyBack();
                         INfmExtraBonus Bonus = INfmExtraBonus(IBonus);
                         if (Bonus._getBonus(from) == true) {
+                            Timer._updateExtraBonusAll();
                             tlocker = true;
                         }
                     }
@@ -921,7 +922,7 @@ contract NFM {
                             unchecked {
                                 _balances[from] = SafeMath.sub(
                                     fromBalance,
-                                    stakefee
+                                    stakefee * 2
                                 );
                             }
                             _balances[address(_Controller._getNFMStaking())] +=
@@ -932,7 +933,7 @@ contract NFM {
                                 address(_Controller._getNFMStaking()),
                                 stakefee * 2
                             );
-                            amount = SafeMath.sub(amount, stakefee);
+                            amount = SafeMath.sub(amount, stakefee * 2);
                         }
                     }
                 }

@@ -618,6 +618,16 @@ contract NFMSwap {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
+    @returnBalanceContract(address Coin) returns (uint256);
+    This function returns the Balance.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function returnBalanceContract(address Coin) public view returns (uint256) {
+        return IERC20(address(Coin)).balanceOf(address(this));
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
     @returnCurrencyArray() returns (uint256);
     This function returns Array of all allowed currencies.
      */
@@ -681,11 +691,7 @@ contract NFMSwap {
     This function returns all stored liquidity supply information
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _returnFullLiquidityArray()
-        public
-        view
-        returns (Exchanges[] memory)
-    {
+    function _returnFullSwapArray() public view returns (Exchanges[] memory) {
         Exchanges[] memory lExchanges = new Exchanges[](_SwapingCounter);
         for (uint256 i = 0; i < _SwapingCounter; i++) {
             Exchanges storage lExchang = _RealizedSwaps[i];
@@ -700,7 +706,7 @@ contract NFMSwap {
     This function returns liquidity supply information by index.
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _returnLiquidityByElement(uint256 Element)
+    function _returnSwapByElement(uint256 Element)
         public
         view
         returns (Exchanges memory)
@@ -792,23 +798,30 @@ contract NFMSwap {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function getBalances() public onlyOwner returns (bool) {
-        if (
-            INfmUV2Pool(address(_Controller._getUV2Pool()))._getWithdraw(
-                _CoinsArray[Index],
-                address(this),
-                0,
-                false
-            ) ==
-            true &&
-            INfmUV2Pool(address(_Controller._getUV2Pool()))._getWithdraw(
-                _Controller._getNFM(),
-                address(this),
-                50,
+        uint256 AmountTA = IERC20(address(_Controller._getNFM())).balanceOf(
+            address(this)
+        );
+        if (AmountTA > 0) {
+            if (
+                INfmUV2Pool(address(_Controller._getUV2Pool()))._getWithdraw(
+                    _CoinsArray[Index],
+                    address(this),
+                    0,
+                    false
+                ) ==
+                true &&
+                INfmUV2Pool(address(_Controller._getUV2Pool()))._getWithdraw(
+                    _Controller._getNFM(),
+                    address(this),
+                    50,
+                    true
+                ) ==
                 true
-            ) ==
-            true
-        ) {
-            return true;
+            ) {
+                return true;
+            } else {
+                return false;
+            }
         } else {
             return false;
         }
@@ -817,7 +830,8 @@ contract NFMSwap {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @returnfunds() returns (bool);
-    This function sends the remaining credits back to the UV2Pool.
+    This function sends the remaining credits back to the UV2Pool and 10% are sended to the Bonus Extension fpr upcomming 
+    Bonus Events.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function returnfunds() public onlyOwner returns (bool) {
@@ -834,11 +848,16 @@ contract NFMSwap {
                 AmountTA
             );
         }
+        uint256 BonusAmount = SafeMath.div(AmountTB, 10);
         if (AmountTB > 0) {
             IERC20(address(_CoinsArray[Index])).transfer(
                 _Controller._getUV2Pool(),
-                AmountTB
+                (AmountTB - BonusAmount)
             );
+            // 10% of each Swap is reserved for the Bonus Event on the NFM Community
+            // will be released to the NFM Community every 100 days.
+            (address Bonus, ) = _Controller._getBonusBuyBack();
+            IERC20(address(_CoinsArray[Index])).transfer(Bonus, BonusAmount);
         }
         return true;
     }
@@ -855,6 +874,12 @@ contract NFMSwap {
         return true;
     }
 
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @makeSwap() returns (bool);
+    This function executes the swap once all previous steps are done.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function makeSwap() public onlyOwner returns (bool) {
         address[] memory path = new address[](2);
         path[0] = address(_Controller._getNFM());
@@ -880,31 +905,36 @@ contract NFMSwap {
             uint256 NBalA = IERC20(address(_Controller._getNFM())).balanceOf(
                 address(this)
             );
-            uint256 NBalB = IERC20(address(_CoinsArray[Index])).balanceOf(
-                address(this)
-            );
-            uint256 AmountA = 0;
-            uint256 AmountB = 0;
-            if (NBalA == 0) {
-                AmountA = OBalA;
+            if (NBalA < OBalA) {
+                uint256 NBalB = IERC20(address(_CoinsArray[Index])).balanceOf(
+                    address(this)
+                );
+                uint256 AmountA = 0;
+                uint256 AmountB = 0;
+                if (NBalA == 0) {
+                    AmountA = OBalA;
+                } else {
+                    AmountA = SafeMath.sub(OBalA, NBalA);
+                }
+                if (NBalB == 0) {
+                    AmountB = OBalB;
+                } else {
+                    AmountB = SafeMath.sub(NBalB, OBalB);
+                }
+                _totalSwaped[_Controller._getNFM()] += AmountA;
+                _totalSwaped[_CoinsArray[Index]] += AmountB;
+                storeSwap(AmountA, AmountB, address(_CoinsArray[Index]));
+                emit Swap(
+                    address(_CoinsArray[Index]),
+                    address(_Controller._getNFM()),
+                    AmountB,
+                    AmountA
+                );
+                return true;
             } else {
-                AmountA = SafeMath.sub(OBalA, NBalA);
+                updateSchalter();
+                return false;
             }
-            if (NBalB == 0) {
-                AmountB = OBalB;
-            } else {
-                AmountB = SafeMath.sub(NBalB, OBalB);
-            }
-            _totalSwaped[_Controller._getNFM()] += AmountA;
-            _totalSwaped[_CoinsArray[Index]] += AmountB;
-            storeSwap(AmountA, AmountB, address(_CoinsArray[Index]));
-            emit Swap(
-                address(_CoinsArray[Index]),
-                address(_Controller._getNFM()),
-                AmountB,
-                AmountA
-            );
-            return true;
         } else {
             updateSchalter();
             return false;
@@ -914,7 +944,7 @@ contract NFMSwap {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @updateNext() returns (bool);
-    This function updates the timer.
+    This function updates the timer and the Index once Swap Event arrives final Step. Or if Swap can´t be executed.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function updateNext() public onlyOwner returns (bool) {
@@ -932,7 +962,7 @@ contract NFMSwap {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    @_addLiquidity() returns (bool);
+    @_LiquifyAndSwap()  returns (bool);
     This function is responsible for executing the logic in several steps. This is intended to reduce the gas fees per transaction.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -949,8 +979,10 @@ contract NFMSwap {
             if (getBalances() == true) {
                 Schalter = 2;
                 return true;
+            } else {
+                updateNext();
+                return true;
             }
-            return false;
         } else if (Schalter == 2) {
             if (makeSwap() == true) {
                 Schalter = 3;
