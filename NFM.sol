@@ -670,8 +670,6 @@ contract NFM {
                     tlocker == false &&
                     block.timestamp >= Timer._getUV2_LiquidityTime()
                 ) {
-                    //Add Liquidity
-
                     INfmAddLiquidity Liquidity = INfmAddLiquidity(
                         _Controller._getLiquidity()
                     );
