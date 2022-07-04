@@ -101,6 +101,8 @@ interface INfmController {
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface INfmTimer {
     function _updateUV2_Liquidity_event() external returns (bool);
+
+    function _getStartTime() external view returns (uint256);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1067,35 +1069,42 @@ contract NFMLiquidity {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _addLiquidity() public virtual onlyOwner returns (bool) {
-        if (Schalter == 0) {
-            if (startLiquidityLogic() == true) {
-                Schalter = 1;
-                return true;
+        if (
+            (INfmTimer(address(_Controller._getTimer()))._getStartTime() +
+                (3600 * 24 * 30 * 12 * 11)) > block.timestamp
+        ) {
+            if (Schalter == 0) {
+                if (startLiquidityLogic() == true) {
+                    Schalter = 1;
+                    return true;
+                }
+                return false;
+            } else if (Schalter == 1) {
+                if (getBalances() == true) {
+                    Schalter = 2;
+                    return true;
+                }
+                return false;
+            } else if (Schalter == 2) {
+                if (putLiquidity() == true) {
+                    Schalter = 3;
+                    return true;
+                }
+                return false;
+            } else if (Schalter == 3) {
+                if (returnfunds() == true) {
+                    Schalter = 4;
+                    return true;
+                }
+                return false;
+            } else if (Schalter == 4) {
+                if (updateNext() == true) {
+                    return true;
+                }
+                return false;
+            } else {
+                return false;
             }
-            return false;
-        } else if (Schalter == 1) {
-            if (getBalances() == true) {
-                Schalter = 2;
-                return true;
-            }
-            return false;
-        } else if (Schalter == 2) {
-            if (putLiquidity() == true) {
-                Schalter = 3;
-                return true;
-            }
-            return false;
-        } else if (Schalter == 3) {
-            if (returnfunds() == true) {
-                Schalter = 4;
-                return true;
-            }
-            return false;
-        } else if (Schalter == 4) {
-            if (updateNext() == true) {
-                return true;
-            }
-            return false;
         } else {
             return false;
         }
