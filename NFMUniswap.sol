@@ -524,6 +524,8 @@ contract NFMUniswap {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     mapping(uint256 => mapping(address => bool)) public _RIVaults;
     mapping(address => mapping(address => uint256)) public _LPBalances;
+    mapping(address => uint256) public RDLP;
+    mapping(address => uint256) public RDLP10Amount;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     CONTRACT EVENTS
@@ -585,7 +587,7 @@ contract NFMUniswap {
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function returnCurrencyArrayLenght() public view returns (uint256) {
-        return _CoinArrLength;
+        return _CoinsArray.length;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -602,7 +604,27 @@ contract NFMUniswap {
         _CoinsArray = Coin;
         return true;
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @addCoinToList(address Coin) returns (bool);
+    This function adds new Coins to the End of the Array.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function addCoinToList(address Coin) public onlyOwner returns (bool){
+        _CoinsArray.push(Coin);
+        RDLP[Coin]=0;
+        return true;
+    }
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @changeCoinInList(address Coin,uint256 Num) returns (bool);
+    This function changes a Coin Address inside the Array by index..
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function changeCoinInList(address Coin,uint256 Num) public onlyOwner returns (bool){
+        _CoinsArray[Num]=Coin;
+        return true;
+    }
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @returnLPBalance(address Coin) returns (uint256);
@@ -629,6 +651,33 @@ contract NFMUniswap {
         return _UV2Pairs;
     }
 
+    function inicialiseRedeemLPToken() public onlyOwner returns (bool, uint256){
+        if(RDLP[_CoinsArray[Index]]==0){
+            address _UV2Pairs = IUniswapV2Factory(
+            IUniswapV2Router02(_uniswapV2Router).factory()
+        ).getPair(address(_Controller._getNFM()), _CoinsArray[Index]);
+        uint256 fullLP=IERC20(address(_UV2Pairs)).balanceOf(address(this));
+            if(fullLP>0){
+            RDLP10Amount[_CoinsArray[Index]]=SafeMath.div(fullLP,10);
+            RDLP[_CoinsArray[Index]]=1;
+            return (true, SafeMath.sub(fullLP, SafeMath.mul(RDLP10Amount[_CoinsArray[Index]], 9)));
+            }else{
+                RDLP[_CoinsArray[Index]]=1;
+                return (false,0);
+            }
+        }else{
+            address _UV2Pairs = IUniswapV2Factory(
+            IUniswapV2Router02(_uniswapV2Router).factory()
+        ).getPair(address(_Controller._getNFM()), _CoinsArray[Index]);
+            uint256 fullLP=IERC20(address(_UV2Pairs)).balanceOf(address(this));
+            if(fullLP>0 && RDLP10Amount[_CoinsArray[Index]]>0){
+                return (true, RDLP10Amount[_CoinsArray[Index]]);
+            }else{
+                return (false, 0);
+            }
+        }
+
+    }
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_getWithdraw(address Coin,address To,uint256 amount,bool percent) returns (bool);
