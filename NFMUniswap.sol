@@ -502,13 +502,12 @@ interface IUniswapV2Factory {
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /// @title NFMUniswap.sol
 /// @author Fernando Viktor Seidl E-mail: viktorseidl@gmail.com
-/// @notice This contract is responsible for the liquidations. Here, NFM are exchanged for other coins to obtain
-///                liquidity for further LP tokens.
-/// @dev This extension regulates UniswapV2 swap events every 9 days.
+/// @notice This contract is responsible for the Uniswap Protocol and supports the NFMSwap and NFMLiquidity Protocol.
+///                All currencies for the NFMSwap and NFMLiquidity Protocol are sourced from this contract..
+/// @dev This extension includes all necessary functionalities for redeeming the Liquidity Token after 11 years.
 ///
 ///         INFO:
-///         -   Every 9 days, NFM are exchanged for other currencies. This resulting liquidity is split between the bonus
-///             and the Uv2Pool in a 10/90 ratio
+///         -   After 11 years, all existing liquidity tokens are redeemed in a 29-day cycle and the profits are divided accordingly.
 ///
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 contract NFMUniswap {
@@ -525,13 +524,11 @@ contract NFMUniswap {
     address private _SController;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    uint256 _CoinArrLength      => Counts index length 
     address[] _CoinsArray       => Contains the all allowed currencies
-    uint256 Index               => Contains the upcoming index 
+    uint256 Index                 => Contains the upcoming index 
     uint256 Schalter            => Contains the step switcher for removing Liquidity  
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    uint256 public _CoinArrLength;
     address[] public _CoinsArray;
     uint256 public Index = 0;
     uint256 private Schalter = 0;
@@ -568,11 +565,14 @@ contract NFMUniswap {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     MAPPINGS
-    _RIVaults(uint Index, SCAddress, boolean)               //Contains all Vaults
-    _LPBalances (LP Address, Coin address, Amount Coin)     //Contains all returns of the LP Redemption
+    RDLP (Coin address, numeric boolean 0 if no 1 if true)     //Contains boolean value
+    RDLP10Amount (Coin address, LP Token amount)     //Contains a tenth amount of the total amount
+    _RemovedLiquidity (Index, Struct)     //Contains a struct for each realized redemption
+    _totalLiquidity (Coin address, total amount liquidity)     //Contains the total Liquidity provided per Coin
+    _totalLiquiditySet (Coin address, boolean)     //Contains a Boolean value whether the total liquidity data exists 
+    _totalYield (Coin address, Yield amount)     //Contains the total yield per currency
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    mapping(uint256 => mapping(address => bool)) public _RIVaults;
     mapping(address => uint256) public RDLP;
     mapping(address => uint256) public RDLP10Amount;
     mapping(uint256 => LiquidityRemove) public _RemovedLiquidity;
@@ -608,10 +608,7 @@ contract NFMUniswap {
         _;
     }
 
-    constructor(
-        address Controller,
-        address Router
-    ) {
+    constructor(address Controller, address Router) {
         _Owner = msg.sender;
         INfmController Cont = INfmController(Controller);
         _Controller = Cont;
@@ -771,29 +768,27 @@ contract NFMUniswap {
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function inicialiseRedeemLPToken() public onlyOwner returns (bool) {
-        if(IERC20(address(_CoinsArray[Index])).balanceOf(
-                address(this)
-            )>0){
-        IERC20(address(_CoinsArray[Index])).transfer(
-            _Controller._getTreasury(),
-            IERC20(address(_CoinsArray[Index])).balanceOf(address(this))
-        );}
-        if(IERC20(address(_Controller._getNFM())).balanceOf(
-                address(this)
-            )>0){
-        IERC20(address(_Controller._getNFM())).transfer(
-            _Controller._getTreasury(),
-            IERC20(address(_CoinsArray[Index])).balanceOf(address(this))
-        );}
-        _UV2Pair = IUniswapV2Factory(
-                IUniswapV2Router02(_uniswapV2Router).factory()
-            ).getPair(address(_Controller._getNFM()), _CoinsArray[Index]);
+        if (Index >= returnCurrencyArrayLenght()) {
+            Index = 0;
+        }
+        if (IERC20(address(_CoinsArray[Index])).balanceOf(address(this)) > 0) {
+            IERC20(address(_CoinsArray[Index])).transfer(
+                _Controller._getTreasury(),
+                IERC20(address(_CoinsArray[Index])).balanceOf(address(this))
+            );
+        }
+        if (
+            IERC20(address(_Controller._getNFM())).balanceOf(address(this)) > 0
+        ) {
+            IERC20(address(_Controller._getNFM())).transfer(
+                _Controller._getTreasury(),
+                IERC20(address(_CoinsArray[Index])).balanceOf(address(this))
+            );
+        }
+        _UV2Pair = returnLPTokenAdress(_CoinsArray[Index]);
 
         if (RDLP[_CoinsArray[Index]] == 0) {
-            
-            uint256 fullLP = IERC20(address(_UV2Pair)).balanceOf(
-                address(this)
-            );
+            uint256 fullLP = IERC20(address(_UV2Pair)).balanceOf(address(this));
             if (fullLP > 0) {
                 RDLP10Amount[_CoinsArray[Index]] = SafeMath.div(fullLP, 10);
                 RDLP[_CoinsArray[Index]] = 1;
@@ -808,10 +803,7 @@ contract NFMUniswap {
                 return false;
             }
         } else {
-            
-            uint256 fullLP = IERC20(address(_UV2Pair)).balanceOf(
-                address(this)
-            );
+            uint256 fullLP = IERC20(address(_UV2Pair)).balanceOf(address(this));
             if (fullLP > 0 && RDLP10Amount[_CoinsArray[Index]] > 0) {
                 nextRedeemption = RDLP10Amount[_CoinsArray[Index]];
                 return true;
@@ -830,44 +822,47 @@ contract NFMUniswap {
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function removeLiquidity() public virtual onlyOwner returns (bool) {
         uint256 LPAmount = nextRedeemption;
-        if (
-            INfmTimer(address(_Controller._getTimer()))
-                ._getUV2_RemoveLiquidityTime() < block.timestamp
-        ) {
-            
-            uint256 fullLP = IERC20(address(_UV2Pair)).balanceOf(
-                address(this)
-            );
-            if (fullLP > 0 && fullLP >= LPAmount) {
-                IERC20(address(_UV2Pair)).approve(
-                    address(_uniswapV2Router),
-                    LPAmount
+        if (LPAmount > 0) {
+            if (
+                INfmTimer(address(_Controller._getTimer()))
+                    ._getUV2_RemoveLiquidityTime() <= block.timestamp
+            ) {
+                uint256 fullLP = IERC20(address(_UV2Pair)).balanceOf(
+                    address(this)
                 );
-                // remove the liquidity
-                (uint256 amountA, uint256 amountB) = _uniswapV2Router
-                    .removeLiquidity(
-                        address(_Controller._getNFM()),
-                        address(_CoinsArray[Index]),
-                        LPAmount,
-                        0, // slippage is unavoidable
-                        0, // slippage is unavoidable
-                        address(this),
-                        block.timestamp + 1
+                if (fullLP > 0 && fullLP >= LPAmount) {
+                    IERC20(address(_UV2Pair)).approve(
+                        address(_uniswapV2Router),
+                        LPAmount
                     );
-                storeLiquidityRemove(
-                    amountA,
-                    amountB,
-                    LPAmount,
-                    address(_CoinsArray[Index])
-                );
-                emit LPR(
-                    _UV2Pair,
-                    _CoinsArray[Index],
-                    amountB,
-                    amountA,
-                    LPAmount
-                );
-                return true;
+                    // remove the liquidity
+                    (uint256 amountA, uint256 amountB) = _uniswapV2Router
+                        .removeLiquidity(
+                            address(_Controller._getNFM()),
+                            address(_CoinsArray[Index]),
+                            LPAmount,
+                            0, // slippage is unavoidable
+                            0, // slippage is unavoidable
+                            address(this),
+                            block.timestamp + 1
+                        );
+                    storeLiquidityRemove(
+                        amountA,
+                        amountB,
+                        LPAmount,
+                        address(_CoinsArray[Index])
+                    );
+                    emit LPR(
+                        _UV2Pair,
+                        _CoinsArray[Index],
+                        amountB,
+                        amountA,
+                        LPAmount
+                    );
+                    return true;
+                } else {
+                    return false;
+                }
             } else {
                 return false;
             }
@@ -908,7 +903,7 @@ contract NFMUniswap {
     /*
     @splittingCoinreturns() returns (bool);
     This function checks whether the payouts count towards yield or liquidity. Liquidity is paid out to Treasury, Governance 
-    and Devs. On the other hand, 20% of the return is paid out to the NFM community.
+    and Devs. On the other hand, 20% of the yield is paid out to the NFM community.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function splittingCoinreturns(address Coin)
@@ -960,6 +955,12 @@ contract NFMUniswap {
         }
     }
 
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @doLiquidity(address Coin, uint256 FullValue) returns (bool);
+    This function handles the distribution of liquidity
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function doLiquidity(address Coin, uint256 FullValue)
         public
         onlyOwner
@@ -990,6 +991,12 @@ contract NFMUniswap {
         }
     }
 
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @doYields(address Coin, uint256 FullValue) returns (bool);
+    This function handles the distribution of the yields
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function doYields(address Coin, uint256 FullValue)
         public
         onlyOwner
@@ -1025,6 +1032,12 @@ contract NFMUniswap {
         }
     }
 
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @redeemLPToken() returns (bool);
+    This function is responsible for processing the protocol accordingly
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function redeemLPToken() public onlyOwner returns (bool) {
         if (Schalter == 0) {
             if (inicialiseRedeemLPToken() == true) {
