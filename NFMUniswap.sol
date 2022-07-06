@@ -525,22 +525,39 @@ contract NFMUniswap {
     address private _SController;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    uint256 _CoinArrLength        => Counts index length 
-    address[] _CoinsArray           => Contains the all allowed currencies
-    uint256 Index                         => Contains the upcoming index 
-    uint256 _SwapingCounter     => Contains all fulfilled swaps 
-    struct Exchanges                   => contains all important information about the swap 
+    uint256 _CoinArrLength      => Counts index length 
+    address[] _CoinsArray       => Contains the all allowed currencies
+    uint256 Index               => Contains the upcoming index 
+    uint256 Schalter            => Contains the step switcher for removing Liquidity  
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 public _CoinArrLength;
     address[] public _CoinsArray;
     uint256 public Index = 0;
-    uint256 public _RemoveLPCounter = 0;
     uint256 private Schalter = 0;
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    uint256 _RemoveLPCounter    => Counts added Structs 
+    uint256 nextRedeemption     => Contains the upcoming LP-Token Amount to be removed
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    uint256 public _RemoveLPCounter = 0;
     uint256 private nextRedeemption;
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    address _uniswapV2Router    => Contains the UniswapRouter Interface 
+    address _URouter            => Contains the Uniswap Router Address
+    address _URouter            => Contains the actual UniswapPair to redeem
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     IUniswapV2Router02 public _uniswapV2Router;
     address private _URouter;
-    address private _OracleAdr;
+    address private _UV2Pair;
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    struct LiquidityRemove      => Contains all Information about the removed Liquidity 
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     struct LiquidityRemove {
         uint256 AmountA;
         uint256 AmountB;
@@ -551,12 +568,11 @@ contract NFMUniswap {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     MAPPINGS
-    _RIVaults(uint Index, SCAddress, boolean)       //Contains all Vaults
+    _RIVaults(uint Index, SCAddress, boolean)               //Contains all Vaults
     _LPBalances (LP Address, Coin address, Amount Coin)     //Contains all returns of the LP Redemption
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     mapping(uint256 => mapping(address => bool)) public _RIVaults;
-    mapping(address => mapping(address => uint256)) public _LPBalances;
     mapping(address => uint256) public RDLP;
     mapping(address => uint256) public RDLP10Amount;
     mapping(uint256 => LiquidityRemove) public _RemovedLiquidity;
@@ -594,8 +610,7 @@ contract NFMUniswap {
 
     constructor(
         address Controller,
-        address Router,
-        address NFMOracle
+        address Router
     ) {
         _Owner = msg.sender;
         INfmController Cont = INfmController(Controller);
@@ -604,7 +619,6 @@ contract NFMUniswap {
         _URouter = Router;
         IUniswapV2Router02 uniswapV2Router = IUniswapV2Router02(Router);
         _uniswapV2Router = uniswapV2Router;
-        _OracleAdr = NFMOracle;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -757,19 +771,27 @@ contract NFMUniswap {
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function inicialiseRedeemLPToken() public onlyOwner returns (bool) {
+        if(IERC20(address(_CoinsArray[Index])).balanceOf(
+                address(this)
+            )>0){
         IERC20(address(_CoinsArray[Index])).transfer(
             _Controller._getTreasury(),
             IERC20(address(_CoinsArray[Index])).balanceOf(address(this))
-        );
+        );}
+        if(IERC20(address(_Controller._getNFM())).balanceOf(
+                address(this)
+            )>0){
         IERC20(address(_Controller._getNFM())).transfer(
             _Controller._getTreasury(),
             IERC20(address(_CoinsArray[Index])).balanceOf(address(this))
-        );
-        if (RDLP[_CoinsArray[Index]] == 0) {
-            address _UV2Pairs = IUniswapV2Factory(
+        );}
+        _UV2Pair = IUniswapV2Factory(
                 IUniswapV2Router02(_uniswapV2Router).factory()
             ).getPair(address(_Controller._getNFM()), _CoinsArray[Index]);
-            uint256 fullLP = IERC20(address(_UV2Pairs)).balanceOf(
+
+        if (RDLP[_CoinsArray[Index]] == 0) {
+            
+            uint256 fullLP = IERC20(address(_UV2Pair)).balanceOf(
                 address(this)
             );
             if (fullLP > 0) {
@@ -786,10 +808,8 @@ contract NFMUniswap {
                 return false;
             }
         } else {
-            address _UV2Pairs = IUniswapV2Factory(
-                IUniswapV2Router02(_uniswapV2Router).factory()
-            ).getPair(address(_Controller._getNFM()), _CoinsArray[Index]);
-            uint256 fullLP = IERC20(address(_UV2Pairs)).balanceOf(
+            
+            uint256 fullLP = IERC20(address(_UV2Pair)).balanceOf(
                 address(this)
             );
             if (fullLP > 0 && RDLP10Amount[_CoinsArray[Index]] > 0) {
@@ -814,14 +834,12 @@ contract NFMUniswap {
             INfmTimer(address(_Controller._getTimer()))
                 ._getUV2_RemoveLiquidityTime() < block.timestamp
         ) {
-            address _UV2Pairs = IUniswapV2Factory(
-                IUniswapV2Router02(_uniswapV2Router).factory()
-            ).getPair(address(_Controller._getNFM()), _CoinsArray[Index]);
-            uint256 fullLP = IERC20(address(_UV2Pairs)).balanceOf(
+            
+            uint256 fullLP = IERC20(address(_UV2Pair)).balanceOf(
                 address(this)
             );
             if (fullLP > 0 && fullLP >= LPAmount) {
-                IERC20(address(_UV2Pairs)).approve(
+                IERC20(address(_UV2Pair)).approve(
                     address(_uniswapV2Router),
                     LPAmount
                 );
@@ -842,10 +860,8 @@ contract NFMUniswap {
                     LPAmount,
                     address(_CoinsArray[Index])
                 );
-                _LPBalances[_UV2Pairs][_Controller._getNFM()] += amountA;
-                _LPBalances[_UV2Pairs][_CoinsArray[Index]] += amountB;
                 emit LPR(
-                    _UV2Pairs,
+                    _UV2Pair,
                     _CoinsArray[Index],
                     amountB,
                     amountA,
@@ -885,7 +901,6 @@ contract NFMUniswap {
             _totalLiquiditySet[_CoinsArray[Index]] = true;
             _totalLiquidity[_CoinsArray[Index]] = LiquidityTotalPool;
         }
-
         return true;
     }
 
