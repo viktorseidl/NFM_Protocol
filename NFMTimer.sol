@@ -42,6 +42,8 @@ contract NFMTimer {
     _EndMint                                         => The end of the minting process is set at 8 years after initialization
     _ExtraBonusAll                                => Automatic distribution event to the NFM community for special currencies like WBTC, WBNB, ... resulting from earnings or profits.
     _ExtraBonusAllEnd                         => 24 hour time window for the bonus special payments
+    _ExtraBonusAirdrop                                => Automatic distribution event to the NFM community for special currencies from the IDO LaunchPad.
+    _ExtraBonusAirdropEnd                         => 24 hour time window for the Airdrop payments
     _StartBurn                                       => Time stamp for starting the burning process. Is set to 4 years after initialization
     _StartBuyBack                                => Timestamp for the start of the buyback program. Is set to 11 years after the end of the burning process.
     _SetUpLogicCountdown                 => Lead time until the logic is initialized
@@ -62,13 +64,13 @@ contract NFMTimer {
     uint256 private _ExtraBonusAirdropEnd;
     uint256 private _StartBurn;
     uint256 private _StartBuyBack;
-    uint256 private _SetUpLogicCountdown; //Countdown for starting
+    uint256 private _SetUpLogicCountdown; 
     uint256 private _YearInterval = 3600 * 24 * 30 * 12;
     uint256 private _DayInterval = 3600 * 24;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     MODIFIER
-    onlyOwner       => Only Controller listed Contracts and Owner can interact with this contract.
+    onlyOwner       => Only Controller listed (full right) Contracts and Owner can interact with this contract.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     modifier onlyOwner() {
@@ -96,50 +98,75 @@ contract NFMTimer {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _StartLogic(uint256 CountDays) public onlyOwner returns (bool) {
+        //  Inicialise Countdown until Logic starts
+        //  Countdown is set to 60 Days
         _SetUpLogicCountdown = block.timestamp + (_DayInterval * CountDays);
+        //  Inicialise Swap Event
+        //  Every 9 Days later + 5 Hours
         _UV2_Swap_event =
             block.timestamp +
-            (3600 * 5 + (_DayInterval * (9 + CountDays))); //Every 9 Days later + 5 Hours
+            (3600 * 5 + (_DayInterval * (9 + CountDays))); 
+        //  Inicialise Liquidity Event
+        //  Every 7 Days later + 5 Hours
         _UV2_Liquidity_event =
             block.timestamp +
-            (3600 * 10 + (_DayInterval * (7 + CountDays))); //Every 7 Days later + 5 Hours
+            (3600 * 10 + (_DayInterval * (7 + CountDays))); 
+        //  Inicialise Bonus Event
+        //  Every 100 Days later + 15 Hours
         _ExtraBonusAll =
             block.timestamp +
-            (3600 * 15 + (_DayInterval * (100 + CountDays))); //Every 100 Days later + 15 Hours
+            (3600 * 15 + (_DayInterval * (100 + CountDays))); 
+        //  Inicialise Bonus time window
+        //  Every 100 Days later + 15 Hours + 24 Hours
         _ExtraBonusAllEnd = _ExtraBonusAll + (_DayInterval * (CountDays + 1));
+        //  Inicialise Airdrop Event
+        //  Every 6 Days later + 18 Hours
         _ExtraBonusAirdrop =
             block.timestamp +
-            (3600 * 18 + (_DayInterval * (6 + CountDays))); //Every 6 Days later + 15 Hours
+            (3600 * 18 + (_DayInterval * (6 + CountDays))); 
+        //  Inicialise Airdrop time window
         _ExtraBonusAirdropEnd =
             _ExtraBonusAirdrop +
             (_DayInterval * (CountDays + 1));
+        //  Inicialise Redeem  LP Token Event inicially set to + 11 years
+        //  Starts first in 11 years and will be scheduled every 29 days
         _UV2_RemoveLiquidity_event =
             block.timestamp +
             (_YearInterval * 11) +
-            (_DayInterval * CountDays); //Time Event in 11 Years
-        _DailyMint = block.timestamp + (_DayInterval * (CountDays + 1)); //Every Day for 8 Years
-        _BeginLogic = block.timestamp + (_DayInterval * CountDays); //Timestamp for logic start
+            (_DayInterval * CountDays); 
+        //  Inicialise Minting Event
+        //  Every Day for 8 Years
+        _DailyMint = block.timestamp + (_DayInterval * (CountDays + 1)); 
+        //  Inicialise logic start Event
+        //  Starts immediatly when Countdown ends
+        _BeginLogic = block.timestamp + (_DayInterval * CountDays); 
+        //  Inicialise Minting time window 
+        //  Is set fixed to 8 years + 1 Hour 
         _EndMint =
             block.timestamp +
             (_YearInterval * 8) +
             3600 +
-            (_DayInterval * CountDays); //8 Years from Start + 1 Hour
+            (_DayInterval * CountDays);
+        //  Inicialise BuyBack Event
+        //  Every 30 Days + 20 Hours after Burning has ended
         _StartBuyBack =
             block.timestamp +
             (_YearInterval * 11) +
             (3600 * 20) +
-            (_DayInterval * CountDays); //Every month + 20 Hours after Burning ended
+            (_DayInterval * CountDays); 
+        //  Inicialise Burning Event
+        //  Is set to 4 Years after Logic has started
         _StartBurn =
             block.timestamp +
             (_YearInterval * 4) +
-            (_DayInterval * CountDays); //After 4 years from start time on every transaction
+            (_DayInterval * CountDays); 
         return true;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_timetester(uint256 timernum, uint256 btimestamp) returns (bool);
-    This function is there for testing the timestamps and is no longer used after successful tests
+    This function is there for testing the timestamps and is no longer used after successfull tests
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _timetester(uint256 timernum, uint256 btimestamp)
@@ -147,21 +174,32 @@ contract NFMTimer {
         onlyOwner
         returns (bool)
     {
+        //Test Minting
         if (timernum == 1) {
             _DailyMint = btimestamp;
+        //Test Swap
         } else if (timernum == 2) {
             _UV2_Swap_event = btimestamp;
+        //Test Liquidity
         } else if (timernum == 3) {
             _UV2_Liquidity_event = btimestamp;
+        //Test Redeem LP-Token
         } else if (timernum == 4) {
-            _ExtraBonusAll = btimestamp;
+            _UV2_RemoveLiquidity_event = btimestamp;
+        //Test Bonus
         } else if (timernum == 5) {
-            _StartBuyBack = btimestamp;
+            _ExtraBonusAll = btimestamp;
+        //Test BuyBack
         } else if (timernum == 6) {
-            _StartBurn = btimestamp;
+            _StartBuyBack = btimestamp;
+        //Test Burning
         } else if (timernum == 7) {
-            _SetUpLogicCountdown = btimestamp;
+            _StartBurn = btimestamp;
+        //Test Countdown
         } else if (timernum == 8) {
+            _SetUpLogicCountdown = btimestamp;
+        //Test Airdrop
+        } else if (timernum == 9) {
             _ExtraBonusAirdrop = btimestamp;
         }
 
@@ -183,7 +221,7 @@ contract NFMTimer {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_updateExtraBonusAirdrop() returns (bool);
-    This function updates the bonus timestamp including the 24-hour time slot
+    This function updates the Airdrop timestamp including the 24-hour time slot
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _updateExtraBonusAirdrop() public onlyOwner returns (bool) {
@@ -217,7 +255,7 @@ contract NFMTimer {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_updateUV2_Liquidity_event() returns (bool);
-    This function updates the Liquidity timestamp
+    This function updates the add Liquidity timestamp
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _updateUV2_Liquidity_event() public onlyOwner returns (bool) {
@@ -228,7 +266,7 @@ contract NFMTimer {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_updateDailyMint() returns (bool);
-    This function updates the Mint timestamp
+    This function updates the daily Minting timestamp
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _updateDailyMint() public onlyOwner returns (bool) {
@@ -239,7 +277,7 @@ contract NFMTimer {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_updateUV2_RemoveLiquidity_event()  returns (bool);
-    This function updates the Mint timestamp
+    This function updates the remove Liquidity timestamp
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _updateUV2_RemoveLiquidity_event()
@@ -256,7 +294,7 @@ contract NFMTimer {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_getStartTime() returns (uint256);
-    This function returns the start time
+    This function returns the start logic time
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _getStartTime() public view returns (uint256) {
@@ -266,7 +304,7 @@ contract NFMTimer {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_getEndMintTime() returns (uint256);
-    This function returns the end of Mint time
+    This function returns the end of Minting time
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _getEndMintTime() public view returns (uint256) {
@@ -276,7 +314,7 @@ contract NFMTimer {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_getDailyMintTime() returns (uint256);
-    This function returns the DailyMint time
+    This function returns the daily Minting time
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _getDailyMintTime() public view returns (uint256) {
@@ -296,7 +334,7 @@ contract NFMTimer {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_getUV2_RemoveLiquidityTime() returns (uint256);
-    This function returns the RemoveLiquidity time
+    This function returns the remove Liquidity time
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _getUV2_RemoveLiquidityTime() public view returns (uint256) {
@@ -346,7 +384,7 @@ contract NFMTimer {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_getExtraBonusAirdropTime() returns (uint256);
-    This function returns the Bonus time
+    This function returns the Airdrop time
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _getExtraBonusAirdropTime() public view returns (uint256) {
@@ -356,7 +394,7 @@ contract NFMTimer {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_getEndExtraBonusAirdropTime() returns (uint256);
-    This function returns the end Bonus time
+    This function returns the end Airdrop time
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _getEndExtraBonusAirdropTime() public view returns (uint256) {
