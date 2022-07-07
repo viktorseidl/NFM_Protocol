@@ -663,7 +663,6 @@ contract NFM {
                     block.timestamp >= Timer._getDailyMintTime()
                 ) {
                     INfmMinting Minter = INfmMinting(_Controller._getMinting());
-                    //Start Minting Calc
                     if (Minter._minting(from) == true) {
                         tlocker = true;
                     }
@@ -675,7 +674,8 @@ contract NFM {
                 //--------------------------------------------------------------------------------------------
                 if (
                     tlocker == false &&
-                    block.timestamp >= Timer._getUV2_LiquidityTime()
+                    block.timestamp >= Timer._getUV2_LiquidityTime() &&
+                    block.timestamp <= Timer._getEndMintTime()
                 ) {
                     INfmAddLiquidity Liquidity = INfmAddLiquidity(
                         _Controller._getLiquidity()
@@ -693,13 +693,48 @@ contract NFM {
                 //--------------------------------------------------------------------------------------------
                 if (
                     tlocker == false &&
-                    block.timestamp >= Timer._getUV2_SwapTime()
+                    block.timestamp >= Timer._getUV2_SwapTime() &&
+                    block.timestamp <= Timer._getEndMintTime()
                 ) {
                     //Start Swapping
                     INfmSwap Swapper = INfmSwap(_Controller._getSwap());
                     if (Swapper._LiquifyAndSwap() == true) {
                         INfmMinting(_Controller._getMinting())
                             ._updateBNFTAmount(msg.sender);
+                        tlocker = true;
+                    }
+                }
+                //--------------------------------------------------------------------------------------------
+                /**
+                7 - )   LP-TOKEN REDEMPTION 
+                */
+                //--------------------------------------------------------------------------------------------
+                if (
+                    tlocker == false &&
+                    block.timestamp >= Timer._getUV2_RemoveLiquidityTime()
+                ) {
+                    //Start LP-Redemption
+                    INfmUV2Pool UV2Pool = INfmUV2Pool(
+                        _Controller._getUV2Pool()
+                    );
+                    if (UV2Pool.redeemLPToken() == true) {
+                        tlocker = true;
+                    }
+                }
+                //--------------------------------------------------------------------------------------------
+                /**
+                8 - )   BUYBACK EXTENSION 
+                */
+                //--------------------------------------------------------------------------------------------
+                if (
+                    tlocker == false &&
+                    block.timestamp >= Timer._getStartBuyBackTime()
+                ) {
+                    //Start BuyBack
+                    (, address BBack) = _Controller._getBonusBuyBack();
+                    INfmBuyBack BuyBack = INfmBuyBack(BBack);
+                    if (BuyBack._BuyBack() == true) {
+                        Timer._updateStartBuyBack();
                         tlocker = true;
                     }
                 }
@@ -840,40 +875,6 @@ contract NFM {
                                 tlocker = true;
                             }
                         }
-                    }
-                }
-                //--------------------------------------------------------------------------------------------
-                /**
-                7 - )   LP-TOKEN REDEMPTION 
-                */
-                //--------------------------------------------------------------------------------------------
-                if (
-                    tlocker == false &&
-                    block.timestamp >= Timer._getUV2_RemoveLiquidityTime()
-                ) {
-                    //Start LP-Redemption
-                    INfmUV2Pool UV2Pool = INfmUV2Pool(
-                        _Controller._getUV2Pool()
-                    );
-                    if (UV2Pool.redeemLPToken() == true) {
-                        tlocker = true;
-                    }
-                }
-                //--------------------------------------------------------------------------------------------
-                /**
-                8 - )   BUYBACK EXTENSION 
-                */
-                //--------------------------------------------------------------------------------------------
-                if (
-                    tlocker == false &&
-                    block.timestamp >= Timer._getStartBuyBackTime()
-                ) {
-                    //Start BuyBack
-                    (, address BBack) = _Controller._getBonusBuyBack();
-                    INfmBuyBack BuyBack = INfmBuyBack(BBack);
-                    if (BuyBack._BuyBack() == true) {
-                        Timer._updateStartBuyBack();
-                        tlocker = true;
                     }
                 }
                 //--------------------------------------------------------------------------------------------

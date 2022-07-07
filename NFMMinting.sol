@@ -103,12 +103,14 @@ interface INfmController {
 
     function _getTimer() external pure returns (address);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // IERC20
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface IERC20 {
     function _mint(address to, uint256 amount) external;
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // INFMTIMER
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -122,6 +124,7 @@ interface INfmTimer {
 
     function _updateDailyMint() external returns (bool);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /// @title NFMMinting.sol
 /// @author Fernando Viktor Seidl E-mail: viktorseidl@gmail.com
@@ -139,12 +142,12 @@ interface INfmTimer {
 contract NFMMinting {
     //include SafeMath
     using SafeMath for uint256;
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     CONTROLLER
     OWNER = MSG.SENDER ownership will be handed over to dao
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     address private _Owner;
     INfmController public _Controller;
     address private _SController;
@@ -159,7 +162,7 @@ contract NFMMinting {
     _BonusAmount                          => Minting Bonus paid to the executer
     struct Mintings                          => Contains information about the respective minting
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 private _MonthlyEmissionCount = 1;
     uint256 private _DailyEmissionCount;
     uint256 private _dailyBNFTAmount;
@@ -176,7 +179,7 @@ contract NFMMinting {
     CONTRACT EVENTS
     Mint (Issuing Address "= address zero", Executor address, Timestamp, issued token amount)
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     event Mint(
         address indexed zero,
         address indexed minter,
@@ -188,14 +191,14 @@ contract NFMMinting {
     MAPPINGS
     mintingtable (minting number, Minting information as an Struct. (Executor, minting amount, timestamp));
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     mapping(uint256 => Mintings) public mintingtable;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     MODIFIER
     onlyOwner       => Only Controller listed Contracts and Owner can interact with this contract.
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     modifier onlyOwner() {
         require(
             _Controller._checkWLSC(_SController, msg.sender) == true ||
@@ -214,25 +217,35 @@ contract NFMMinting {
         _DailyEmissionCount = 0;
         _dailyBNFTAmount = 0;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_updateBNFTAmount(address minter) returns (bool);
     This function is executed on every successful minting. and is responsible for paying out the Minting Bonus.
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _updateBNFTAmount(address minter) public onlyOwner virtual returns (bool) {
-        if (block.timestamp < INfmTimer(address(_Controller._getTimer()))._getEndMintTime()) {
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _updateBNFTAmount(address minter)
+        public
+        virtual
+        onlyOwner
+        returns (bool)
+    {
+        if (
+            block.timestamp <
+            INfmTimer(address(_Controller._getTimer()))._getEndMintTime()
+        ) {
             IERC20(address(_Controller._getNFM()))._mint(minter, _BonusAmount);
             _dailyBNFTAmount += _BonusAmount;
         }
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @calculateParts(uint256 amount) returns (uint256,uint256,uint256,uint256,uint256);
     This function is executed on every successful minting. and returns the split amounts.
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function calculateParts(uint256 amount)
         public
         pure
@@ -252,13 +265,18 @@ contract NFMMinting {
         uint256 TY = SafeMath.sub(amount, (UV + ST + GV + DV));
         return (UV, ST, GV, DV, TY);
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @storeMint(address Sender, uint256 amount);
     This function is responsible for mapping the minting
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function storeMint(address Sender, uint256 amount) internal onlyOwner virtual {
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function storeMint(address Sender, uint256 amount)
+        internal
+        virtual
+        onlyOwner
+    {
         mintingtable[_datamintCount] = Mintings(
             Sender,
             amount,
@@ -266,47 +284,46 @@ contract NFMMinting {
         );
         _datamintCount++;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    @_getAllMintings(uint256 Elements) returns (struct Mintings);
+    @_getAllMintings() returns (struct Mintings);
     This function returns information about all mintings that have taken place
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _getAllMintings(uint256 Elements)
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _getAllMintings() public view returns (Mintings[] memory) {
+        Mintings[] memory lMintings = new Mintings[](_datamintCount);
+        for (uint256 i = 0; i < _datamintCount; i++) {
+            Mintings storage lMinting = mintingtable[i];
+            lMintings[i] = lMinting;
+        }
+        return lMintings;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_getMintingsByElement(uint256 Elements) returns (struct Mintings);
+    This function returns information about an minting by Index
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _getMintingsByElement(uint256 Elements)
         public
         view
-        returns (Mintings[] memory)
+        returns (Mintings memory)
     {
-        if (Elements == 0) {
-            Mintings[] memory lMintings = new Mintings[](_datamintCount);
-            for (uint256 i = 0; i < _datamintCount; i++) {
-                Mintings storage lMinting = mintingtable[i];
-                lMintings[i] = lMinting;
-            }
-            return lMintings;
-        } else {
-            Mintings[] memory lMintings = new Mintings[](
-                _datamintCount - Elements
-            );
-            for (
-                uint256 i = _datamintCount - Elements;
-                i < _datamintCount;
-                i++
-            ) {
-                Mintings storage lMinting = mintingtable[i];
-                lMintings[i] = lMinting;
-            }
-            return lMintings;
-        }
+        return mintingtable[Elements];
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_minting(address sender) returns (bool);
     This function is responsible for executing the minting logic
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _minting(address sender) public onlyOwner virtual returns (bool) {
-        (uint256 EYearAmount, uint256 EDayAmount) = INfmTimer(address(_Controller._getTimer()))._getEA();
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _minting(address sender) public virtual onlyOwner returns (bool) {
+        (uint256 EYearAmount, uint256 EDayAmount) = INfmTimer(
+            address(_Controller._getTimer())
+        )._getEA();
         uint256 amount = SafeMath.sub(EDayAmount, _dailyBNFTAmount);
         if (_MonthlyEmissionCount == 11 && _DailyEmissionCount == 29) {
             //Check minting amount of the year
@@ -323,11 +340,26 @@ contract NFMMinting {
                 uint256 DevsAmount,
                 uint256 TreasuryAmount
             ) = calculateParts(SafeMath.sub(amount, 10 * 10**18));
-            IERC20(address(_Controller._getNFM()))._mint(_Controller._getUV2Pool(), UVamount); // 5%
-            IERC20(address(_Controller._getNFM()))._mint(_Controller._getNFMStakingTreasuryERC20(), StakeAmount); // 65
-            IERC20(address(_Controller._getNFM()))._mint(_Controller._getDaoReserveERC20(), GovAmount); // 5%
-            IERC20(address(_Controller._getNFM()))._mint(_Controller._getDistribute(), DevsAmount); // 10%
-            IERC20(address(_Controller._getNFM()))._mint(_Controller._getTreasury(), TreasuryAmount); //15%
+            IERC20(address(_Controller._getNFM()))._mint(
+                _Controller._getUV2Pool(),
+                UVamount
+            ); // 5%
+            IERC20(address(_Controller._getNFM()))._mint(
+                _Controller._getNFMStakingTreasuryERC20(),
+                StakeAmount
+            ); // 65
+            IERC20(address(_Controller._getNFM()))._mint(
+                _Controller._getDaoReserveERC20(),
+                GovAmount
+            ); // 5%
+            IERC20(address(_Controller._getNFM()))._mint(
+                _Controller._getDistribute(),
+                DevsAmount
+            ); // 10%
+            IERC20(address(_Controller._getNFM()))._mint(
+                _Controller._getTreasury(),
+                TreasuryAmount
+            ); //15%
             IERC20(address(_Controller._getNFM()))._mint(sender, _BonusAmount);
             storeMint(sender, amount);
             INfmTimer(address(_Controller._getTimer()))._updateDailyMint();
@@ -355,11 +387,26 @@ contract NFMMinting {
                 uint256 DevsAmount,
                 uint256 TreasuryAmount
             ) = calculateParts(SafeMath.sub(amount, 10 * 10**18));
-            IERC20(address(_Controller._getNFM()))._mint(_Controller._getUV2Pool(), UVamount); // 5%
-            IERC20(address(_Controller._getNFM()))._mint(_Controller._getNFMStakingTreasuryERC20(), StakeAmount); // 65
-            IERC20(address(_Controller._getNFM()))._mint(_Controller._getDaoReserveERC20(), GovAmount); // 5%
-            IERC20(address(_Controller._getNFM()))._mint(_Controller._getDistribute(), DevsAmount); // 10%
-            IERC20(address(_Controller._getNFM()))._mint(_Controller._getTreasury(), TreasuryAmount); //15%
+            IERC20(address(_Controller._getNFM()))._mint(
+                _Controller._getUV2Pool(),
+                UVamount
+            ); // 5%
+            IERC20(address(_Controller._getNFM()))._mint(
+                _Controller._getNFMStakingTreasuryERC20(),
+                StakeAmount
+            ); // 65
+            IERC20(address(_Controller._getNFM()))._mint(
+                _Controller._getDaoReserveERC20(),
+                GovAmount
+            ); // 5%
+            IERC20(address(_Controller._getNFM()))._mint(
+                _Controller._getDistribute(),
+                DevsAmount
+            ); // 10%
+            IERC20(address(_Controller._getNFM()))._mint(
+                _Controller._getTreasury(),
+                TreasuryAmount
+            ); //15%
             IERC20(address(_Controller._getNFM()))._mint(sender, _BonusAmount);
             storeMint(sender, amount);
             INfmTimer(address(_Controller._getTimer()))._updateDailyMint();

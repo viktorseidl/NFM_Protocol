@@ -64,7 +64,7 @@ contract NFMTimer {
     uint256 private _ExtraBonusAirdropEnd;
     uint256 private _StartBurn;
     uint256 private _StartBuyBack;
-    uint256 private _SetUpLogicCountdown; 
+    uint256 private _SetUpLogicCountdown;
     uint256 private _YearInterval = 3600 * 24 * 30 * 12;
     uint256 private _DayInterval = 3600 * 24;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -105,17 +105,17 @@ contract NFMTimer {
         //  Every 9 Days later + 5 Hours
         _UV2_Swap_event =
             block.timestamp +
-            (3600 * 5 + (_DayInterval * (9 + CountDays))); 
+            (3600 * 5 + (_DayInterval * (9 + CountDays)));
         //  Inicialise Liquidity Event
         //  Every 7 Days later + 5 Hours
         _UV2_Liquidity_event =
             block.timestamp +
-            (3600 * 10 + (_DayInterval * (7 + CountDays))); 
+            (3600 * 10 + (_DayInterval * (7 + CountDays)));
         //  Inicialise Bonus Event
         //  Every 100 Days later + 15 Hours
         _ExtraBonusAll =
             block.timestamp +
-            (3600 * 15 + (_DayInterval * (100 + CountDays))); 
+            (3600 * 15 + (_DayInterval * (100 + CountDays)));
         //  Inicialise Bonus time window
         //  Every 100 Days later + 15 Hours + 24 Hours
         _ExtraBonusAllEnd = _ExtraBonusAll + (_DayInterval * (CountDays + 1));
@@ -123,7 +123,7 @@ contract NFMTimer {
         //  Every 6 Days later + 18 Hours
         _ExtraBonusAirdrop =
             block.timestamp +
-            (3600 * 18 + (_DayInterval * (6 + CountDays))); 
+            (3600 * 18 + (_DayInterval * (6 + CountDays)));
         //  Inicialise Airdrop time window
         _ExtraBonusAirdropEnd =
             _ExtraBonusAirdrop +
@@ -133,15 +133,15 @@ contract NFMTimer {
         _UV2_RemoveLiquidity_event =
             block.timestamp +
             (_YearInterval * 11) +
-            (_DayInterval * CountDays); 
+            (_DayInterval * CountDays);
         //  Inicialise Minting Event
         //  Every Day for 8 Years
-        _DailyMint = block.timestamp + (_DayInterval * (CountDays + 1)); 
+        _DailyMint = block.timestamp + (_DayInterval * (CountDays + 1));
         //  Inicialise logic start Event
         //  Starts immediatly when Countdown ends
-        _BeginLogic = block.timestamp + (_DayInterval * CountDays); 
-        //  Inicialise Minting time window 
-        //  Is set fixed to 8 years + 1 Hour 
+        _BeginLogic = block.timestamp + (_DayInterval * CountDays);
+        //  Inicialise Minting time window
+        //  Is set fixed to 8 years + 1 Hour
         _EndMint =
             block.timestamp +
             (_YearInterval * 8) +
@@ -153,13 +153,13 @@ contract NFMTimer {
             block.timestamp +
             (_YearInterval * 11) +
             (3600 * 20) +
-            (_DayInterval * CountDays); 
+            (_DayInterval * CountDays);
         //  Inicialise Burning Event
         //  Is set to 4 Years after Logic has started
         _StartBurn =
             block.timestamp +
             (_YearInterval * 4) +
-            (_DayInterval * CountDays); 
+            (_DayInterval * CountDays);
         return true;
     }
 
@@ -177,28 +177,28 @@ contract NFMTimer {
         //Test Minting
         if (timernum == 1) {
             _DailyMint = btimestamp;
-        //Test Swap
+            //Test Swap
         } else if (timernum == 2) {
             _UV2_Swap_event = btimestamp;
-        //Test Liquidity
+            //Test Liquidity
         } else if (timernum == 3) {
             _UV2_Liquidity_event = btimestamp;
-        //Test Redeem LP-Token
+            //Test Redeem LP-Token
         } else if (timernum == 4) {
             _UV2_RemoveLiquidity_event = btimestamp;
-        //Test Bonus
+            //Test Bonus
         } else if (timernum == 5) {
             _ExtraBonusAll = btimestamp;
-        //Test BuyBack
+            //Test BuyBack
         } else if (timernum == 6) {
             _StartBuyBack = btimestamp;
-        //Test Burning
+            //Test Burning
         } else if (timernum == 7) {
             _StartBurn = btimestamp;
-        //Test Countdown
+            //Test Countdown
         } else if (timernum == 8) {
             _SetUpLogicCountdown = btimestamp;
-        //Test Airdrop
+            //Test Airdrop
         } else if (timernum == 9) {
             _ExtraBonusAirdrop = btimestamp;
         }
