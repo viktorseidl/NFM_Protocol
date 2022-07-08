@@ -176,6 +176,7 @@ contract NFMOracle {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     mapping(address => AggregatorV3Interface) public _Oracle;
+    mapping(address => uint256) public _OracleSet;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     MODIFIER
@@ -201,20 +202,25 @@ contract NFMOracle {
     ) {
         _Owner = msg.sender;
         _Oracle[BnbAddress] = AggregatorV3Interface(
-            0x82a6c4AF830caa6c97bb504425f6A66165C2c26e
+            0x2514895c72f50D8bd4B4F9b1110F0D6bD2c97526
         );
+        _OracleSet[BnbAddress] = 1;
         _Oracle[BtcAddress] = AggregatorV3Interface(
-            0xc907E116054Ad103354f2D350FD2514433D57F6f
+            0x5741306c21795FdCBb9b265Ea0255F499DFe515C
         );
+        _OracleSet[BtcAddress] = 1;
         _Oracle[DaiAddress] = AggregatorV3Interface(
-            0xFC539A559e170f848323e19dfD66007520510085
+            0xE4eE17114774713d2De0eC0f035d4F7665fc025D
         );
+        _OracleSet[DaiAddress] = 1;
         _Oracle[WethAddress] = AggregatorV3Interface(
-            0xF9680D99D6C9589e2a93a78A04A279e509205945
+            0x143db3CEEfbdfe5631aDD3E50f7614B6ba708BA7
         );
+        _OracleSet[WethAddress] = 1;
         _Oracle[WmaticAddress] = AggregatorV3Interface(
-            0xAB594600376Ec9fD91F8e885dADF0CE036862dE0
+            0x957Eb0316f02ba4a9De3D308742eefd44a3c1719
         );
+        _OracleSet[WmaticAddress] = 1;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -229,6 +235,7 @@ contract NFMOracle {
         returns (bool)
     {
         _Oracle[Coin] = AggregatorV3Interface(address(Aggregators));
+        _OracleSet[Coin] = 1;
         return true;
     }
 
@@ -239,16 +246,20 @@ contract NFMOracle {
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _getLatestPrice(address coin) public view returns (uint256) {
-        (
-            ,
-            /*uint80 roundID*/
-            uint256 price, /*uint startedAt*/ /*uint timeStamp*/ /*uint80 answeredInRound*/
-            ,
-            ,
+        if (_OracleSet[coin] > 0) {
+            (
+                ,
+                /*uint80 roundID*/
+                uint256 price, /*uint startedAt*/ /*uint timeStamp*/ /*uint80 answeredInRound*/
+                ,
+                ,
 
-        ) = _Oracle[coin].latestRoundData();
-        price = SafeMath.div(price, 10**2);
-        return price;
+            ) = _Oracle[coin].latestRoundData();
+            price = SafeMath.div(price, 10**2);
+            return price;
+        } else {
+            return 0;
+        }
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

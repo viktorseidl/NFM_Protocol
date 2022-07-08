@@ -351,6 +351,17 @@ interface IUniswapV2Pair {
 // IUNISWAPV2FACTORY
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface IUniswapV2Factory {
+    event PairCreated(
+        address indexed token0,
+        address indexed token1,
+        address pair,
+        uint256
+    );
+
+    function createPair(address tokenA, address tokenB)
+        external
+        returns (address pair);
+
     function getPair(address tokenA, address tokenB)
         external
         view
@@ -439,7 +450,7 @@ contract NFMExchange {
     address private _USDC;
     address private _OracleAdr;
     address private _uniswapV2Router =
-        0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+        0xD99D1c33F9fC3444f8101754aBC46c52416550D1;
     uint256 private _MinUSD = 10 * 10**18;
     uint256 private _MaxUSD = 200000 * 10**18;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -679,6 +690,23 @@ contract NFMExchange {
             _CurrencyCounter++;
             _isCurrencyAllowed[Coin] = true;
         }
+        return true;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @createPairUv2(address Coin) returns (bool);
+    This function is for inicialising or creating the uniswap pairs.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function createPairUv2(address Coin) public returns (bool) {
+        IUniswapV2Factory(IUniswapV2Router02(_uniswapV2Router).factory())
+            .createPair(
+                address(_Controller._getNFM()),
+                address(
+                    Coin /*COIN ADDRESS */
+                )
+            );
         return true;
     }
 

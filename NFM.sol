@@ -907,11 +907,15 @@ contract NFM {
                                 );
                             }
                             _balances[
-                                address(_Controller._getNFMStaking())
+                                address(
+                                    _Controller._getNFMStakingTreasuryERC20()
+                                )
                             ] += stakefee;
                             emit Transfer(
                                 from,
-                                address(_Controller._getNFMStaking()),
+                                address(
+                                    _Controller._getNFMStakingTreasuryERC20()
+                                ),
                                 stakefee
                             );
                             amount = SafeMath.sub(amount, (bfee + stakefee));
@@ -923,12 +927,16 @@ contract NFM {
                                     stakefee * 2
                                 );
                             }
-                            _balances[address(_Controller._getNFMStaking())] +=
-                                stakefee *
-                                2;
+                            _balances[
+                                address(
+                                    _Controller._getNFMStakingTreasuryERC20()
+                                )
+                            ] += stakefee * 2;
                             emit Transfer(
                                 from,
-                                address(_Controller._getNFMStaking()),
+                                address(
+                                    _Controller._getNFMStakingTreasuryERC20()
+                                ),
                                 stakefee * 2
                             );
                             amount = SafeMath.sub(amount, stakefee * 2);

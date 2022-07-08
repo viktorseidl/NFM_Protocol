@@ -98,6 +98,7 @@ interface INfmController {
 
     function _getDistribute() external pure returns (address);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // IERC20
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -115,6 +116,7 @@ interface IERC20 {
         uint256 value
     ) external returns (bool);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // INFMMINTING
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -139,7 +141,7 @@ interface INfmMinting {
 /// @title NFMPad.sol
 /// @author Fernando Viktor Seidl E-mail: viktorseidl@gmail.com
 /// @notice This contract regulates the pump and dump safety
-/// @dev As soon as a new address receives NFM, this is automatically included and monitored by this protocol.
+/// @dev As soon as a new address receives NFM, this address is automatically included and monitored by this protocol.
 ///           ***All internal smart contracts belonging to the controller are excluded from the PAD check.***
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 contract NFMPad {
@@ -150,7 +152,7 @@ contract NFMPad {
     CONTROLLER
     OWNER = MSG.SENDER ownership will be handed over to dao
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     address private _Owner;
     INfmController public _Controller;
     address private _SController;
@@ -161,7 +163,7 @@ contract NFMPad {
     PAD2 MAX LIMIT AFTER WHITELISTING = 1,500,000 NFM
     PADFEE FOR BEEING WHITELISTED = 10,000 NFM
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 private PAD1 = 1000000 * 10**18;
     uint256 private PAD2 = 1500000 * 10**18;
     uint256 private PADFEE = 10000 * 10**18;
@@ -170,7 +172,7 @@ contract NFMPad {
     CONTRACT EVENTS
     PadWL (Investor address, Timestamp, paid Fee)
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     event PadWL(address indexed Sender, uint256 indexed Time, uint256 WLfee);
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
@@ -179,7 +181,7 @@ contract NFMPad {
     _PADtimePointer (NFM Owner address, timeinterval of 24 Hours);
     _PADWhiteisting (NFM Owner address, boolean integer "indicating 1 if true 0 if false" for whitelisting activation);
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     mapping(address => uint256) public _PADprotection;
     mapping(address => uint256) public _PADtimePointer;
     mapping(address => uint256) public _PADWhitelisting;
@@ -188,7 +190,7 @@ contract NFMPad {
     MODIFIER
     onlyOwner       => Only Controller listed Contracts and Owner can interact with this contract.
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     modifier onlyOwner() {
         require(
             _Controller._checkWLSC(_SController, msg.sender) == true ||
@@ -211,8 +213,12 @@ contract NFMPad {
     @_PADCHECK(sender, amount) returns (bool);
     This function is called before each transfer. The timestamp, daily limit and whitelisting are checked.
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _PADCHECK(address from, uint256 amount) public onlyOwner returns (bool) {
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _PADCHECK(address from, uint256 amount)
+        public
+        onlyOwner
+        returns (bool)
+    {
         if (_PADtimePointer[from] > 0) {
             //inisialised
             if (_PADtimePointer[from] > block.timestamp) {
@@ -276,7 +282,7 @@ contract NFMPad {
     @balancePAD(address account) returns (uint256);
     This function returns the daily remaining PAD limit
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function balancePAD(address account) public view returns (uint256) {
         if (_PADtimePointer[account] > block.timestamp) {
             if (_PADWhitelisting[account] < 1) {
@@ -295,7 +301,7 @@ contract NFMPad {
     This function performs the whitelisting. For this function to work, the investor must have approved 10,000 NFM to the contract.
     The fees are distributed in equal proportions as in the minting Contract.
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _padWL() public virtual returns (bool) {
         //Client must have approved allowance to PDA contract first
         if (_PADtimePointer[msg.sender] > 0) {} else {
@@ -369,22 +375,24 @@ contract NFMPad {
         emit PadWL(msg.sender, block.timestamp, PADFEE);
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_getPadPointer(address account) returns (uint256);
     This function returns the time interval
     This interval is renewed as soon as 24 hours have elapsed for another 24 hours. The pad limit is also reset to 0. See Function @_PADCHECK
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _getPadPointer(address account) public view returns (uint256) {
         return _PADtimePointer[account];
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_getPadWLState(address account) returns (bool);
     This function returns a boolean value whether the WL is enabled or not.
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _getPadWLState(address account) public view returns (bool) {
         if (_PADWhitelisting[account] == 0) {
             return false;
