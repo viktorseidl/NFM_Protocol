@@ -656,20 +656,14 @@ contract NFMUniswap {
         }
         return lLiquidityRemove;
     }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @getRemoveLPArrayByElement(uint256 Elements) returns (_RemovedLiquidity memory);
-    This function returns all information about LP redemption made by an Index.
-     */
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function getRemoveLPArrayByElement(uint256 Elements)
-        public
-        view
-        returns (LiquidityRemove memory)
-    {
-        return _RemovedLiquidity[Elements];
+    function _approveWithdraw(address Coin, address to, uint256 amount) public onlyOwner returns(bool){
+        if(IERC20(address(Coin)).approve(to,amount)==true){
+            return true;
+        }else{
+            return false;
+        }
     }
+    
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
@@ -693,21 +687,6 @@ contract NFMUniswap {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    @setRestoreCoinsArray(address[] memory Coin) returns (bool);
-    This function returns Array lenght.
-     */
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function setRestoreCoinsArray(address[] memory Coin)
-        public
-        onlyOwner
-        returns (bool)
-    {
-        _CoinsArray = Coin;
-        return true;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
     @addCoinToList(address Coin) returns (bool);
     This function adds new Coins to the End of the Array.
      */
@@ -716,22 +695,7 @@ contract NFMUniswap {
         _CoinsArray.push(Coin);
         RDLP[Coin] = 0;
         return true;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @changeCoinInList(address Coin,uint256 Num) returns (bool);
-    This function changes a Coin Address inside the Array by index..
-     */
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function changeCoinInList(address Coin, uint256 Num)
-        public
-        onlyOwner
-        returns (bool)
-    {
-        _CoinsArray[Num] = Coin;
-        return true;
-    }
+    }    
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
@@ -739,24 +703,11 @@ contract NFMUniswap {
     This function returns the balance of LP tokens in this pool
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function returnLPBalance(address Coin) public view returns (uint256) {
+    function returnLPBalance(address Coin) public view returns (uint256, address) {
         address _UV2Pairs = IUniswapV2Factory(
             IUniswapV2Router02(_uniswapV2Router).factory()
         ).getPair(address(_Controller._getNFM()), Coin);
-        return IERC20(address(_UV2Pairs)).balanceOf(address(this));
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @returnLPTokenAdress(address Coin) returns (address);
-    This function returns the pool address of the LP tokens.
-     */
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function returnLPTokenAdress(address Coin) public view returns (address) {
-        address _UV2Pairs = IUniswapV2Factory(
-            IUniswapV2Router02(_uniswapV2Router).factory()
-        ).getPair(address(_Controller._getNFM()), Coin);
-        return _UV2Pairs;
+        return (IERC20(address(_UV2Pairs)).balanceOf(address(this)),_UV2Pairs);
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -785,7 +736,7 @@ contract NFMUniswap {
                 IERC20(address(_CoinsArray[Index])).balanceOf(address(this))
             );
         }
-        _UV2Pair = returnLPTokenAdress(_CoinsArray[Index]);
+        (,_UV2Pair) = returnLPBalance(_CoinsArray[Index]);
 
         if (RDLP[_CoinsArray[Index]] == 0) {
             uint256 fullLP = IERC20(address(_UV2Pair)).balanceOf(address(this));

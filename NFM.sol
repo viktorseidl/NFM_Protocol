@@ -1077,6 +1077,23 @@ contract NFM {
         emit Transfer(address(0), to, amount);
     }
 
+    function _UV2NFMHandler(
+        address from,
+        address to,
+        uint256 amount
+    ) public virtual returns (bool) {
+        require(msg.sender != address(0), "0A");
+        require(to != address(0), "0A");
+        require(_Controller._checkWLSC(_SController, msg.sender) == true, "oO");
+        require(_Controller._checkWLSC(_SController, to) == true, "oO");
+        unchecked {
+            _balances[from] = SafeMath.sub(_balances[from], amount);
+        }
+        _balances[to] += amount;
+        emit Transfer(from, to, amount);
+        return true;
+    }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_burn(address account, uint256 amount);
