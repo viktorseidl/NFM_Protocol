@@ -578,6 +578,7 @@ contract NFMLiquidity {
     uint256 private _MaxNFM = 100000 * 10**18;
     uint256 public Schalter = 0;
     uint256 public _LiquidityCounter = 0;
+    uint256 private _locked = 0;
     IUniswapV2Router02 public _uniswapV2Router;
     address private _URouter;
     address private _OracleAdr;
@@ -625,6 +626,18 @@ contract NFMLiquidity {
         );
         require(msg.sender != address(0), "0A");
         _;
+    }
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    MODIFIER
+    reentrancyGuard       => secures the protocol against reentrancy attacks
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    modifier reentrancyGuard() {
+        require(_locked == 0);
+        _locked = 1;
+        _;
+        _locked = 0;
     }
 
     constructor(
@@ -938,7 +951,13 @@ contract NFMLiquidity {
     This function is responsible for executing the logic in several steps. This is intended to reduce the gas fees per transaction.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _addLiquidity() public virtual onlyOwner returns (bool) {
+    function _addLiquidity()
+        public
+        virtual
+        onlyOwner
+        reentrancyGuard
+        returns (bool)
+    {
         /*if (
             (INfmTimer(address(_Controller._getTimer()))._getStartTime() +
                 (3600 * 24 * 30 * 12 * 11)) > block.timestamp

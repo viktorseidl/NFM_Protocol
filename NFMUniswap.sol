@@ -656,14 +656,18 @@ contract NFMUniswap {
         }
         return lLiquidityRemove;
     }
-    function _approveWithdraw(address Coin, address to, uint256 amount) public onlyOwner returns(bool){
-        if(IERC20(address(Coin)).approve(to,amount)==true){
+
+    function _approveWithdraw(
+        address Coin,
+        address to,
+        uint256 amount
+    ) public onlyOwner returns (bool) {
+        if (IERC20(address(Coin)).approve(to, amount) == true) {
             return true;
-        }else{
+        } else {
             return false;
         }
     }
-    
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
@@ -695,7 +699,7 @@ contract NFMUniswap {
         _CoinsArray.push(Coin);
         RDLP[Coin] = 0;
         return true;
-    }    
+    }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
@@ -703,11 +707,15 @@ contract NFMUniswap {
     This function returns the balance of LP tokens in this pool
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function returnLPBalance(address Coin) public view returns (uint256, address) {
+    function returnLPBalance(address Coin)
+        public
+        view
+        returns (uint256, address)
+    {
         address _UV2Pairs = IUniswapV2Factory(
             IUniswapV2Router02(_uniswapV2Router).factory()
         ).getPair(address(_Controller._getNFM()), Coin);
-        return (IERC20(address(_UV2Pairs)).balanceOf(address(this)),_UV2Pairs);
+        return (IERC20(address(_UV2Pairs)).balanceOf(address(this)), _UV2Pairs);
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -736,7 +744,7 @@ contract NFMUniswap {
                 IERC20(address(_CoinsArray[Index])).balanceOf(address(this))
             );
         }
-        (,_UV2Pair) = returnLPBalance(_CoinsArray[Index]);
+        (, _UV2Pair) = returnLPBalance(_CoinsArray[Index]);
 
         if (RDLP[_CoinsArray[Index]] == 0) {
             uint256 fullLP = IERC20(address(_UV2Pair)).balanceOf(address(this));

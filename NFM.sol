@@ -378,7 +378,6 @@ contract NFM {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 private _paused;
-    uint256 internal _locked;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     CONTROLLER
@@ -388,18 +387,6 @@ contract NFM {
     address private _Owner;
     INfmController public _Controller;
     address private _SController;
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    MODIFIER
-    reentrancyGuard       => secures the protocol against reentrancy attacks
-     */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    modifier reentrancyGuard() {
-        require(_locked == 0);
-        _locked = 1;
-        _;
-        _locked = 0;
-    }
 
     constructor(
         string memory TokenName,
@@ -522,25 +509,6 @@ contract NFM {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    @Offlocker() returns (bool);
-    This function can only be executed by the Dao and is used to relock the reentrancy
-     */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function Offlocker() public returns (bool) {
-        require(msg.sender != address(0), "0A");
-        require(
-            _Controller._checkWLSC(_SController, msg.sender) == true ||
-                msg.sender == _Owner,
-            "oO"
-        );
-        if (_locked == 1) {
-            _locked = 0;
-        }
-        return true;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
     @transfer(address to, uint256 amount)  returns (bool);
     Strandard ERC20 Function 
      */
@@ -578,7 +546,7 @@ contract NFM {
         address from,
         address to,
         uint256 amount
-    ) internal virtual reentrancyGuard {
+    ) internal virtual {
         require(from != address(0), "0A");
         require(to != address(0), "0A");
         require(_paused == 0, "_P");

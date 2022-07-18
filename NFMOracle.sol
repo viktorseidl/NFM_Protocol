@@ -162,12 +162,6 @@ contract NFMOracle {
     address private _Owner;
     INfmController private _Controller;
     address private _SController;
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    saver           => array for storing values in our own oracle
-    */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    uint256[] private saver;
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
@@ -194,31 +188,35 @@ contract NFMOracle {
     }
 
     constructor(
-        address BnbAddress,
+        address MkrAddress,
         address BtcAddress,
         address DaiAddress,
         address WethAddress,
-        address WmaticAddress
+        address WmaticAddress,
+        address Controller
     ) {
         _Owner = msg.sender;
-        _Oracle[BnbAddress] = AggregatorV3Interface(
-            0x2514895c72f50D8bd4B4F9b1110F0D6bD2c97526
+        INfmController Cont = INfmController(address(Controller));
+        _Controller = Cont;
+        _SController = Controller;
+        _Oracle[MkrAddress] = AggregatorV3Interface(
+            0xa070427bF5bA5709f70e98b94Cb2F435a242C46C
         );
-        _OracleSet[BnbAddress] = 1;
+        _OracleSet[MkrAddress] = 1;
         _Oracle[BtcAddress] = AggregatorV3Interface(
-            0x5741306c21795FdCBb9b265Ea0255F499DFe515C
+            0xc907E116054Ad103354f2D350FD2514433D57F6f
         );
         _OracleSet[BtcAddress] = 1;
         _Oracle[DaiAddress] = AggregatorV3Interface(
-            0xE4eE17114774713d2De0eC0f035d4F7665fc025D
+            0x4746DeC9e833A82EC7C2C1356372CcF2cfcD2F3D
         );
         _OracleSet[DaiAddress] = 1;
         _Oracle[WethAddress] = AggregatorV3Interface(
-            0x143db3CEEfbdfe5631aDD3E50f7614B6ba708BA7
+            0xF9680D99D6C9589e2a93a78A04A279e509205945
         );
         _OracleSet[WethAddress] = 1;
         _Oracle[WmaticAddress] = AggregatorV3Interface(
-            0x957Eb0316f02ba4a9De3D308742eefd44a3c1719
+            0xAB594600376Ec9fD91F8e885dADF0CE036862dE0
         );
         _OracleSet[WmaticAddress] = 1;
     }
@@ -260,31 +258,5 @@ contract NFMOracle {
         } else {
             return 0;
         }
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @_addtoOracle(address Coin, uint256 Price) returns (bool);
-    This function returns the current dollar price of a currency in 6 digit format.
-     */
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _addtoOracle(address Coin, uint256 Price)
-        public
-        onlyOwner
-        returns (bool)
-    {
-        Price = SafeMath.mul(Price, 10**12);
-        uint256[] memory o = new uint256[](1);
-        o[0] = Price;
-        saver = o;
-        if (
-            INfmExchange(address(_Controller._getExchange())).setPriceOracle(
-                Coin,
-                saver
-            ) == true
-        ) {
-            return true;
-        }
-        return false;
     }
 }

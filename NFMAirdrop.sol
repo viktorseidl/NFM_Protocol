@@ -193,6 +193,7 @@ contract NFMAirdrop {
     uint256 public nextRoundCounter = 0;
     uint256 private Schalter = 0;
     uint256 public PayOutCounter = 1;
+    uint256 private _locked = 0;
     address[] private AirdropCoins;
     bool private threeAirdrops = true;
     struct Airdrop {
@@ -249,6 +250,18 @@ contract NFMAirdrop {
         );
         require(msg.sender != address(0), "0A");
         _;
+    }
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    MODIFIER
+    reentrancyGuard       => secures the protocol against reentrancy attacks
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    modifier reentrancyGuard() {
+        require(_locked == 0);
+        _locked = 1;
+        _;
+        _locked = 0;
     }
 
     constructor(address Controller) {
@@ -611,7 +624,12 @@ contract NFMAirdrop {
     In the second step, the payments are made to the transaction participants
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _getAirdrop(address Sender) public onlyOwner returns (bool) {
+    function _getAirdrop(address Sender)
+        public
+        onlyOwner
+        reentrancyGuard
+        returns (bool)
+    {
         if (AirdropCoins.length > nextRoundCounter + 3) {
             threeAirdrops = true;
             if (Schalter == 0) {

@@ -1,6 +1,7 @@
 //SPDX-License-Identifier:MIT
 
 pragma solidity ^0.8.13;
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // LIBRARIES
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -88,6 +89,7 @@ interface INfmController {
 
     function _getNFM() external pure returns (address);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // IERC20
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -96,18 +98,19 @@ interface IERC20 {
 
     function totalSupply() external view returns (uint256);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /// @title NFMBurning.sol
 /// @author Fernando Viktor Seidl E-mail: viktorseidl@gmail.com
 /// @notice This contract regulates the burning of the NFM token and initializes itself after 4 years of logic launch
-/// @dev As soon as the timestamp for Burning Start has passed, the Burning initializes. A mechanism in the transfer 
-///           protocol of the NFM token then automatically charges a burning fee of 4%. This amount is then automatically 
+/// @dev As soon as the timestamp for Burning Start has passed, the Burning initializes. A mechanism in the transfer
+///           protocol of the NFM token then automatically charges a burning fee of 4%. This amount is then automatically
 ///           deducted from the amount sent.
 ///           This burning process is structured as follows:
 ///             - 2% burning fee
 ///             - 2% community fee
 ///
-///             As soon as the total supply of the NFM has reached 1,000,000,000 then the 2% burning fee will be converted 
+///             As soon as the total supply of the NFM has reached 1,000,000,000 then the 2% burning fee will be converted
 ///             into a community fee. From then on, there will be a lifelong 4% community fee on every Transaction.
 ///                     ***The fee is only charged if the transaction exceeds a minimum amount of 2 NFM.***
 ///             ***All internal smart contracts belonging to the controller are excluded from the Burning Events.***
@@ -129,7 +132,7 @@ contract NFMBurning {
     Once this amount has been reached, the burning will stop and the 2% will be an additional community fee. In addition, 
     the BuyBack Program begins when the burning ends
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 private FinalTotalSupply = 1000000000 * 10**18;
 
     constructor(address Controller) {
@@ -137,6 +140,7 @@ contract NFMBurning {
         INfmController Cont = INfmController(Controller);
         _Controller = Cont;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @checkburn(uint256 amount) returns (bool, bool, uint256, uint256);
@@ -147,7 +151,7 @@ contract NFMBurning {
         - Burning Fee amount on the transaction
         - Community Fee amount on the transaction               
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function checkburn(uint256 amount)
         public
         view
@@ -173,12 +177,13 @@ contract NFMBurning {
             return (false, false, 0, 0);
         }
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_calcFee(uint256 amount) returns (uint256);
     This function calculates the 2% fee on the transaction
      */
-     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _calcFee(uint256 amount) public pure returns (uint256) {
         uint256 burnPercent = SafeMath.div(SafeMath.mul(amount, 2), 100);
         return burnPercent;

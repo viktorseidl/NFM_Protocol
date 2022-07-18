@@ -169,6 +169,7 @@ contract NFMMinting {
     uint256 private _datamintCount = 0;
     uint256 private _YearlyEmissionAmount;
     uint256 private _BonusAmount = 10 * 10**18;
+    uint256 private _locked = 0;
     struct Mintings {
         address Sender;
         uint256 amount;
@@ -208,6 +209,18 @@ contract NFMMinting {
         require(msg.sender != address(0), "0A");
         _;
     }
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    MODIFIER
+    reentrancyGuard       => secures the protocol against reentrancy attacks
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    modifier reentrancyGuard() {
+        require(_locked == 0);
+        _locked = 1;
+        _;
+        _locked = 0;
+    }
 
     constructor(address Controller) {
         _Owner = msg.sender;
@@ -228,6 +241,7 @@ contract NFMMinting {
         public
         virtual
         onlyOwner
+        reentrancyGuard
         returns (bool)
     {
         if (
@@ -320,7 +334,13 @@ contract NFMMinting {
     This function is responsible for executing the minting logic
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _minting(address sender) public virtual onlyOwner returns (bool) {
+    function _minting(address sender)
+        public
+        virtual
+        onlyOwner
+        reentrancyGuard
+        returns (bool)
+    {
         (uint256 EYearAmount, uint256 EDayAmount) = INfmTimer(
             address(_Controller._getTimer())
         )._getEA();
