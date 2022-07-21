@@ -1,3 +1,7 @@
+/**
+ *Submitted for verification at polygonscan.com on 2022-07-21
+ */
+
 //SPDX-License-Identifier:MIT
 
 pragma solidity ^0.8.13;
@@ -568,6 +572,7 @@ contract NFMLiquidity {
     _LiquidityCounter       => counts the liquidity events
     _uniswapV2Router    => Interface for interacting with the UniswapV2 Protocol
     _URouter                    => Uniswap Router Address
+    _NFMPricing               => Exchange rate against USD in 18 digit format
     LiquidityAdded            => struct storing all information about an liquidity event
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -582,6 +587,7 @@ contract NFMLiquidity {
     IUniswapV2Router02 public _uniswapV2Router;
     address private _URouter;
     address private _OracleAdr;
+    uint256 public _NFMPricing;
     struct LiquidityAdded {
         uint256 AmountA;
         uint256 AmountB;
@@ -643,7 +649,8 @@ contract NFMLiquidity {
     constructor(
         address Controller,
         address UniswapRouter,
-        address NfmOracle
+        address NfmOracle,
+        uint256 NFMPrice
     ) {
         _Owner = msg.sender;
         INfmController Cont = INfmController(Controller);
@@ -653,6 +660,16 @@ contract NFMLiquidity {
         IUniswapV2Router02 uniswapV2Router = IUniswapV2Router02(UniswapRouter);
         _uniswapV2Router = uniswapV2Router;
         _OracleAdr = NfmOracle;
+        _NFMPricing = NFMPrice;
+    }
+
+    function _updateExchangeRate(uint256 NFMPrice)
+        public
+        onlyOwner
+        returns (bool)
+    {
+        _NFMPricing = NFMPrice;
+        return true;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -893,12 +910,45 @@ contract NFMLiquidity {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function putLiquidity() public onlyOwner returns (bool) {
-        uint256 AmountTA = IERC20(address(_Controller._getNFM())).balanceOf(
-            address(this)
-        );
         uint256 AmountTB = IERC20(address(_CoinsArray[Index])).balanceOf(
             address(this)
         );
+        uint256 AmountTA = IERC20(address(_Controller._getNFM())).balanceOf(
+            address(this)
+        );
+        if (_lastLiquidityDate[_CoinsArray[Index]] > 0) {} else {
+            //First Liquidity calculation needed
+            uint256 latestprice = INfmOracle(_OracleAdr)._getLatestPrice(
+                _CoinsArray[Index]
+            );
+            //create 18 digit price format on coin for calculations
+            uint256 TAAmount18;
+            if (IERC20(address(_CoinsArray[Index])).decimals() < 18) {
+                TAAmount18 = SafeMath.mul(
+                    AmountTB,
+                    10 **
+                        SafeMath.sub(
+                            18,
+                            IERC20(address(_CoinsArray[Index])).decimals()
+                        )
+                );
+            } else {
+                TAAmount18 = AmountTB;
+            }
+            //Returns Amount Coin in Dollar
+            uint256 TAUSDAmount = SafeMath.div(
+                SafeMath.mul(TAAmount18, latestprice),
+                10**6
+            );
+            //Pricing must be the amount of NFM for 1 Dollar like 1 Dollar = 1,33^ NFM in 18 digit format
+            TAAmount18 = SafeMath.div(
+                SafeMath.mul(TAUSDAmount, _NFMPricing),
+                10**18
+            );
+            if (TAAmount18 < AmountTA) {
+                AmountTA = TAAmount18;
+            }
+        }
 
         (uint256 amountA, uint256 amountB, uint256 liquidity) = _uniswapV2Router
             .addLiquidity(

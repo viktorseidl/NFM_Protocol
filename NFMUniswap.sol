@@ -1,3 +1,7 @@
+/**
+ *Submitted for verification at polygonscan.com on 2022-07-21
+ */
+
 //SPDX-License-Identifier:MIT
 
 pragma solidity ^0.8.13;
@@ -105,10 +109,8 @@ interface INfmController {
         external
         view
         returns (address Bonus, address Buyback);
-    
-    function _addWLSC(address root, address client)
-        external
-        returns (bool);
+
+    function _addWLSC(address root, address client) external returns (bool);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -613,7 +615,7 @@ contract NFMUniswap {
         require(msg.sender != address(0), "0A");
         _;
     }
- 
+
     constructor(address Controller, address Router) {
         _Owner = msg.sender;
         INfmController Cont = INfmController(Controller);
@@ -721,32 +723,39 @@ contract NFMUniswap {
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function inicialiseRedeemLPToken() internal virtual returns (bool) {
-        if (Index >= returnCurrencyArrayLenght()) {
+        if (Index == returnCurrencyArrayLenght()) {
             Index = 0;
-        }  
+        }
         //if bigger than 0 it is inicialised
-        if(RDLP[_CoinsArray[Index]] > 0){
-            if(_totalLPS[_CoinsArray[Index]]>0){
-                (,  address UV2Pair) = returnLPBalance(_CoinsArray[Index]);
-                _UV2Pair=UV2Pair;
-                nextRedeemption=RDLP10Amount[_CoinsArray[Index]];
-                
-                return true;                
-            }else{
-                nextRedeemption=0;
-                
+        if (RDLP[_CoinsArray[Index]] > 0) {
+            if (_totalLPS[_CoinsArray[Index]] > 0) {
+                (, address UV2Pair) = returnLPBalance(_CoinsArray[Index]);
+                _UV2Pair = UV2Pair;
+                nextRedeemption = RDLP10Amount[_CoinsArray[Index]];
+
+                return true;
+            } else {
+                nextRedeemption = 0;
+
                 return false;
             }
-        }else{
+        } else {
             //if not inicialised then get Pair address and full balance first
-            (_totalLiquidity[_CoinsArray[Index]],)=INfmLiquidity(address(_Controller._getLiquidity()))._returntotalLiquidity(_CoinsArray[Index]);
-            if(_totalLiquidity[_CoinsArray[Index]]>0){
-                (uint256 LPBalance,  address UV2Pair) = returnLPBalance(_CoinsArray[Index]);
-                _UV2Pair=UV2Pair;
-                if(LPBalance > 0){
-                    _Controller._addWLSC(address(_SController), _UV2Pair);
+            (uint256 test, ) = INfmLiquidity(
+                address(_Controller._getLiquidity())
+            )._returntotalLiquidity(address(_CoinsArray[Index]));
+            _totalLiquidity[_CoinsArray[Index]] = test;
+            if (_totalLiquidity[_CoinsArray[Index]] > 0) {
+                (uint256 LPBalance, address UV2Pair) = returnLPBalance(
+                    _CoinsArray[Index]
+                );
+                _UV2Pair = UV2Pair;
+                if (LPBalance > 0) {
                     //save 1/10 of lp balance as redeemption amount
-                    RDLP10Amount[_CoinsArray[Index]] = SafeMath.div(LPBalance, 10);
+                    RDLP10Amount[_CoinsArray[Index]] = SafeMath.div(
+                        LPBalance,
+                        10
+                    );
                     //set coin pair as inicialised for further redeemptions
                     RDLP[_CoinsArray[Index]] = 1;
                     // save first redeemption amount
@@ -755,68 +764,114 @@ contract NFMUniswap {
                         SafeMath.mul(RDLP10Amount[_CoinsArray[Index]], 9)
                     );
                     // save total Pair LP Amount for monitoring
-                    _totalLPS[_CoinsArray[Index]]=LPBalance;
+                    _totalLPS[_CoinsArray[Index]] = LPBalance;
                     // save total liquidity provided during the 8 years on the coin
-                    
+
                     // true until the break even point is reached
-                    _totalLiquiditySet[_CoinsArray[Index]]=true;
+                    _totalLiquiditySet[_CoinsArray[Index]] = true;
                     return true;
-                }else{
-                    //No Liquidity was added to this Pool 
+                } else {
+                    //No Liquidity was added to this Pool
                     //save 1/10 of lp balance as redeemption amount
-                    RDLP10Amount[_CoinsArray[Index]] = SafeMath.div(LPBalance, 10);
+                    RDLP10Amount[_CoinsArray[Index]] = 0;
                     //set coin pair as inicialised for further redeemptions
                     RDLP[_CoinsArray[Index]] = 1;
                     // save first redeemption amount
                     nextRedeemption = 0;
-                    _totalLPS[_CoinsArray[Index]]=0;
-                    _totalLiquidity[_CoinsArray[Index]]=0;
-                    _totalLiquiditySet[_CoinsArray[Index]]=false;
+                    _totalLPS[_CoinsArray[Index]] = 0;
+                    _totalLiquidity[_CoinsArray[Index]] = 0;
+                    _totalLiquiditySet[_CoinsArray[Index]] = false;
                     return true;
                 }
-            }else{
-                nextRedeemption=0;
-                return false;
+            } else {
+                //No Liquidity was added to this Pool
+                //save 1/10 of lp balance as redeemption amount
+                RDLP10Amount[_CoinsArray[Index]] = 0;
+                //set coin pair as inicialised for further redeemptions
+                RDLP[_CoinsArray[Index]] = 1;
+                // save first redeemption amount
+                nextRedeemption = 0;
+                _totalLPS[_CoinsArray[Index]] = 0;
+                _totalLiquidity[_CoinsArray[Index]] = 0;
+                _totalLiquiditySet[_CoinsArray[Index]] = false;
+                return true;
             }
-        } 
+        }
     }
-    function updateFinal() public onlyOwner returns (bool){
-        finalizer=true;
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @updateFinal() returns (bool);
+    This function is called once all LP-token are redeemed.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function updateFinal() public onlyOwner returns (bool) {
+        finalizer = true;
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @updateMapAmounts() returns (bool);
     This function is responsible for paying out the liquidity. Returns are not paid out.
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function updateMapAmounts() internal virtual returns (bool){
-        _totalLPS[_CoinsArray[Index]]-=nextRedeemption;
+    function updateMapAmounts() internal virtual returns (bool) {
+        _totalLPS[_CoinsArray[Index]] -= nextRedeemption;
         //Check if returns are profit or not
-        uint256 ReturnedCoinValue=IERC20(address(_CoinsArray[Index])).balanceOf(address(this));
+        uint256 ReturnedCoinValue = IERC20(address(_CoinsArray[Index]))
+            .balanceOf(address(this));
         //returns smaller as provided Liquidity, then there are no profits to share
-        if(_totalLiquidity[_CoinsArray[Index]] > ReturnedCoinValue){
-            _totalLiquidity[_CoinsArray[Index]]-=ReturnedCoinValue;
-            uint256 ReturnedCoinValue10=SafeMath.div(ReturnedCoinValue,10);
-            IERC20(address(_CoinsArray[Index])).transfer(address(_Controller._getDistribute()), ReturnedCoinValue10);
-            IERC20(address(_CoinsArray[Index])).transfer(address(_Controller._getTreasury()), SafeMath.mul(ReturnedCoinValue10,5));
-            IERC20(address(_CoinsArray[Index])).transfer(address(_Controller._getDaoReserveERC20()), SafeMath.sub(ReturnedCoinValue,SafeMath.mul(ReturnedCoinValue10,6)));
+        if (_totalLiquidity[_CoinsArray[Index]] > ReturnedCoinValue) {
+            _totalLiquidity[_CoinsArray[Index]] -= ReturnedCoinValue;
+            uint256 ReturnedCoinValue10 = SafeMath.div(ReturnedCoinValue, 10);
+            IERC20(address(_CoinsArray[Index])).transfer(
+                address(_Controller._getDistribute()),
+                ReturnedCoinValue10
+            );
+            IERC20(address(_CoinsArray[Index])).transfer(
+                address(_Controller._getTreasury()),
+                SafeMath.mul(ReturnedCoinValue10, 5)
+            );
+            IERC20(address(_CoinsArray[Index])).transfer(
+                address(_Controller._getDaoReserveERC20()),
+                SafeMath.sub(
+                    ReturnedCoinValue,
+                    SafeMath.mul(ReturnedCoinValue10, 6)
+                )
+            );
             return true;
-        }else{
-            if(_totalLiquidity[_CoinsArray[Index]] > 0 && _totalLiquiditySet[_CoinsArray[Index]]==true){
-            uint256 NormalLiquidty = _totalLiquidity[_CoinsArray[Index]];
-            _totalLiquidity[_CoinsArray[Index]]=0;
-            _totalLiquiditySet[_CoinsArray[Index]]=false;
-            uint256 ReturnedCoinValue10=SafeMath.div(NormalLiquidty,10);
-            IERC20(address(_CoinsArray[Index])).transfer(address(_Controller._getDistribute()), ReturnedCoinValue10);
-            IERC20(address(_CoinsArray[Index])).transfer(address(_Controller._getTreasury()), SafeMath.mul(ReturnedCoinValue10,5));
-            IERC20(address(_CoinsArray[Index])).transfer(address(_Controller._getDaoReserveERC20()), SafeMath.sub(NormalLiquidty,SafeMath.mul(ReturnedCoinValue10,6)));
-            return true;
-            }else{
+        } else {
+            if (
+                _totalLiquidity[_CoinsArray[Index]] > 0 &&
+                _totalLiquiditySet[_CoinsArray[Index]] == true
+            ) {
+                uint256 NormalLiquidty = _totalLiquidity[_CoinsArray[Index]];
+                _totalLiquidity[_CoinsArray[Index]] = 0;
+                _totalLiquiditySet[_CoinsArray[Index]] = false;
+                uint256 ReturnedCoinValue10 = SafeMath.div(NormalLiquidty, 10);
+                IERC20(address(_CoinsArray[Index])).transfer(
+                    address(_Controller._getDistribute()),
+                    ReturnedCoinValue10
+                );
+                IERC20(address(_CoinsArray[Index])).transfer(
+                    address(_Controller._getTreasury()),
+                    SafeMath.mul(ReturnedCoinValue10, 5)
+                );
+                IERC20(address(_CoinsArray[Index])).transfer(
+                    address(_Controller._getDaoReserveERC20()),
+                    SafeMath.sub(
+                        NormalLiquidty,
+                        SafeMath.mul(ReturnedCoinValue10, 6)
+                    )
+                );
+                return true;
+            } else {
                 return true;
             }
         }
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @removeLiquidity() returns (bool);
@@ -824,42 +879,47 @@ contract NFMUniswap {
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function removeLiquidity() internal virtual returns (bool) {
-        if (nextRedeemption > 0 && _totalLPS[_CoinsArray[Index]] > 0 && INfmTimer(address(_Controller._getTimer()))
-                    ._getUV2_RemoveLiquidityTime() <= block.timestamp) {
-                    //Approve LP Token to Router
-                    IERC20(address(_UV2Pair)).approve(
-                        address(_uniswapV2Router),
-                        nextRedeemption
-                    );
-                    // remove the liquidity
-                    (uint256 amountA, uint256 amountB) = _uniswapV2Router
-                        .removeLiquidity(
-                            address(_Controller._getNFM()),
-                            address(_CoinsArray[Index]),
-                            nextRedeemption,
-                            0, // slippage is unavoidable
-                            0, // slippage is unavoidable
-                            address(this),
-                            block.timestamp + 1
-                        );
-                    if(amountA > 0 && amountB > 0){
-                        storeLiquidityRemove(
-                            amountA,
-                            amountB,
-                            nextRedeemption,
-                            address(_CoinsArray[Index])
-                        );
-                        emit LPR(
-                            _UV2Pair,
-                            _CoinsArray[Index],
-                            amountB,
-                            amountA,
-                            nextRedeemption
-                        );
-                        return true;
-                    }else{
-                        return false;
-                    }                           
+        if (
+            nextRedeemption > 0 &&
+            _totalLPS[_CoinsArray[Index]] > 0 &&
+            INfmTimer(address(_Controller._getTimer()))
+                ._getUV2_RemoveLiquidityTime() <=
+            block.timestamp
+        ) {
+            //Approve LP Token to Router
+            IERC20(address(_UV2Pair)).approve(
+                address(_uniswapV2Router),
+                nextRedeemption
+            );
+            // remove the liquidity
+            (uint256 amountA, uint256 amountB) = _uniswapV2Router
+                .removeLiquidity(
+                    address(_Controller._getNFM()),
+                    address(_CoinsArray[Index]),
+                    nextRedeemption,
+                    0, // slippage is unavoidable
+                    0, // slippage is unavoidable
+                    address(this),
+                    block.timestamp + 1
+                );
+            if (amountA > 0 && amountB > 0) {
+                storeLiquidityRemove(
+                    amountA,
+                    amountB,
+                    nextRedeemption,
+                    address(_CoinsArray[Index])
+                );
+                emit LPR(
+                    _UV2Pair,
+                    _CoinsArray[Index],
+                    amountB,
+                    amountA,
+                    nextRedeemption
+                );
+                return true;
+            } else {
+                return false;
+            }
         } else {
             return false;
         }
@@ -878,21 +938,42 @@ contract NFMUniswap {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function calculatingreturns() internal virtual returns (bool) {
         //Check if returns are profit or not
-        uint256 ReturnedCoinValue=IERC20(address(_CoinsArray[Index])).balanceOf(address(this));
-        //if totalLiquidity = 0 and totalLiquiditySet = false, then all further amounts are profits 
-        if(_totalLiquidity[_CoinsArray[Index]] == 0 && _totalLiquiditySet[_CoinsArray[Index]]==false && ReturnedCoinValue > 0){
-            _totalYield[_CoinsArray[Index]]+=ReturnedCoinValue;
-            uint256 ReturnedCoinValue10=SafeMath.div(ReturnedCoinValue,10);
+        uint256 ReturnedCoinValue = IERC20(address(_CoinsArray[Index]))
+            .balanceOf(address(this));
+        //if totalLiquidity = 0 and totalLiquiditySet = false, then all further amounts are profits
+        if (
+            _totalLiquidity[_CoinsArray[Index]] == 0 &&
+            _totalLiquiditySet[_CoinsArray[Index]] == false &&
+            ReturnedCoinValue > 0
+        ) {
+            _totalYield[_CoinsArray[Index]] += ReturnedCoinValue;
+            uint256 ReturnedCoinValue10 = SafeMath.div(ReturnedCoinValue, 10);
             (address Bonus, ) = _Controller._getBonusBuyBack();
-            IERC20(address(_CoinsArray[Index])).transfer(address(_Controller._getDistribute()), ReturnedCoinValue10);
-            IERC20(address(_CoinsArray[Index])).transfer(address(Bonus), SafeMath.mul(ReturnedCoinValue10,2));
-            IERC20(address(_CoinsArray[Index])).transfer(address(_Controller._getTreasury()), SafeMath.mul(ReturnedCoinValue10,4));
-            IERC20(address(_CoinsArray[Index])).transfer(address(_Controller._getDaoReserveERC20()), SafeMath.sub(ReturnedCoinValue,SafeMath.mul(ReturnedCoinValue10,7)));
+            IERC20(address(_CoinsArray[Index])).transfer(
+                address(_Controller._getDistribute()),
+                ReturnedCoinValue10
+            );
+            IERC20(address(_CoinsArray[Index])).transfer(
+                address(Bonus),
+                SafeMath.mul(ReturnedCoinValue10, 2)
+            );
+            IERC20(address(_CoinsArray[Index])).transfer(
+                address(_Controller._getTreasury()),
+                SafeMath.mul(ReturnedCoinValue10, 4)
+            );
+            IERC20(address(_CoinsArray[Index])).transfer(
+                address(_Controller._getDaoReserveERC20()),
+                SafeMath.sub(
+                    ReturnedCoinValue,
+                    SafeMath.mul(ReturnedCoinValue10, 7)
+                )
+            );
             return true;
-        }else{
+        } else {
             return false;
         }
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @distnfmBal() returns (bool);
@@ -905,21 +986,33 @@ contract NFMUniswap {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function distnfmBal() internal virtual returns (bool) {
         //Check if returns are profit or not
-        uint256 ReturnedCoinValue=IERC20(address(_Controller._getNFM())).balanceOf(address(this)); 
-        if(ReturnedCoinValue > 0){
-            uint256 ReturnedCoinValue10=SafeMath.div(ReturnedCoinValue,10);
+        uint256 ReturnedCoinValue = IERC20(address(_Controller._getNFM()))
+            .balanceOf(address(this));
+        if (ReturnedCoinValue > 0) {
+            uint256 ReturnedCoinValue10 = SafeMath.div(ReturnedCoinValue, 10);
             (address Bonus, ) = _Controller._getBonusBuyBack();
-            IERC20(address(_Controller._getNFM())).transfer(address(_Controller._getDistribute()), ReturnedCoinValue10);
-            IERC20(address(_Controller._getNFM())).transfer(address(Bonus), ReturnedCoinValue10);
-            IERC20(address(_Controller._getNFM())).transfer(address(_Controller._getTreasury()), SafeMath.sub(ReturnedCoinValue,SafeMath.mul(ReturnedCoinValue10,2)));
-            
+            IERC20(address(_Controller._getNFM())).transfer(
+                address(_Controller._getDistribute()),
+                ReturnedCoinValue10
+            );
+            IERC20(address(_Controller._getNFM())).transfer(
+                address(Bonus),
+                ReturnedCoinValue10
+            );
+            IERC20(address(_Controller._getNFM())).transfer(
+                address(_Controller._getTreasury()),
+                SafeMath.sub(
+                    ReturnedCoinValue,
+                    SafeMath.mul(ReturnedCoinValue10, 2)
+                )
+            );
+
             return true;
-        }else{
+        } else {
             return false;
         }
     }
 
-    
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @redeemLPToken() returns (bool);
@@ -927,7 +1020,7 @@ contract NFMUniswap {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function redeemLPToken() public onlyOwner returns (bool) {
-        if(finalizer==true){
+        if (finalizer == true) {
             return false;
         }
         if (Schalter == 0) {
@@ -946,12 +1039,12 @@ contract NFMUniswap {
                 updateNext();
                 return false;
             }
-        }else if (Schalter == 2) {
+        } else if (Schalter == 2) {
             if (updateMapAmounts() == true) {
                 Schalter = 3;
             }
             return true;
-        }else if (Schalter == 3) {
+        } else if (Schalter == 3) {
             ///Spliting the returns
             Schalter = 4;
             if (calculatingreturns() == true) {
@@ -962,7 +1055,7 @@ contract NFMUniswap {
         } else if (Schalter == 4) {
             ///Spliting the returns
             Schalter = 5;
-            if (distnfmBal() == true) {                
+            if (distnfmBal() == true) {
                 return true;
             } else {
                 return false;
@@ -974,8 +1067,6 @@ contract NFMUniswap {
             return false;
         }
     }
-
-    
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*

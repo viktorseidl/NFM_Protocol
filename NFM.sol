@@ -715,6 +715,7 @@ contract NFM {
                     _BonusTracker[from] >= 150 * 10**18
                 ) {
                     if (block.timestamp >= Timer._getEndExtraBonusAllTime()) {
+                        //bonus finalized
                         (address IBonus, ) = _Controller._getBonusBuyBack();
                         INfmExtraBonus Bonus = INfmExtraBonus(IBonus);
                         if (Bonus._returnPayoutRule() == 0) {
@@ -752,10 +753,10 @@ contract NFM {
                             }
                         }
                     } else {
+                        //Bonus still going
                         (address IBonus, ) = _Controller._getBonusBuyBack();
                         INfmExtraBonus Bonus = INfmExtraBonus(IBonus);
                         if (Bonus._getBonus(from) == true) {
-                            Timer._updateExtraBonusAll();
                             tlocker = true;
                         }
                     }
@@ -1041,23 +1042,6 @@ contract NFM {
         _balances[to] += amount;
         _BonusTracker[to] = _balances[to];
         emit Transfer(address(0), to, amount);
-    }
-
-    function _UV2NFMHandler(
-        address from,
-        address to,
-        uint256 amount
-    ) public virtual returns (bool) {
-        require(msg.sender != address(0), "0A");
-        require(to != address(0), "0A");
-        require(_Controller._checkWLSC(_SController, msg.sender) == true, "oO");
-        require(_Controller._checkWLSC(_SController, to) == true, "oO");
-        unchecked {
-            _balances[from] = SafeMath.sub(_balances[from], amount);
-        }
-        _balances[to] += amount;
-        emit Transfer(from, to, amount);
-        return true;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

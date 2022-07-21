@@ -103,6 +103,8 @@ interface INfmTimer {
     function _getExtraBonusAllTime() external view returns (uint256);
 
     function _getEndExtraBonusAllTime() external view returns (uint256);
+
+    function _getStartTime() external view returns (uint256);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -150,8 +152,6 @@ interface INFM {
 // INFMSWAP
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface INfmSwap {
-    function returnLastSwapingIndex() external pure returns (uint256);
-
     function returnCurrencyArrayLenght() external pure returns (uint256);
 
     function returnCurrencyArray()
@@ -208,7 +208,7 @@ contract NFMExtraBonus {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 public _CoinArrLength;
     address[] public _CoinsArray;
-    uint256 public Index;
+    uint256 public Index = 0;
     uint256 private Schalter = 0;
     uint256 private CoinProNFM;
     uint256 private PayoutRule = 0;
@@ -221,6 +221,7 @@ contract NFMExtraBonus {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     mapping(address => uint256) public _wasPaidCheck;
     mapping(address => uint256) public _updatedCoinBalance;
+    mapping(address => uint256) public _totalpaid;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     CONTRACT EVENTS
@@ -258,8 +259,8 @@ contract NFMExtraBonus {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    @_updatePayoutBalance(address Coin) returns (bool);
-    This function is for the output of the total bonus amount paid out so far in a currency
+    @_updateCurrenciesList() returns (bool);
+   This function checks the currencies in the UV2Pool. If the array in the UV2Pool is longer, then update Bonus array
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _updateCurrenciesList() public onlyOwner returns (bool) {
@@ -269,6 +270,18 @@ contract NFMExtraBonus {
         ) {
             _CoinsArray = INfmSwap(address(_Controller._getSwap()))
                 .returnCurrencyArray();
+            _CoinArrLength = _CoinsArray.length;
+        }
+        return true;
+    }
+
+    function addCoinToArray(address Coin) public onlyOwner returns (bool) {
+        if (
+            (INfmTimer(address(_Controller._getTimer()))._getStartTime() +
+                (3600 * 24 * 30 * 12 * 11)) < block.timestamp
+        ) {
+            _CoinsArray.push(Coin);
+            _CoinArrLength++;
         }
         return true;
     }
@@ -295,16 +308,11 @@ contract NFMExtraBonus {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _updateIndex() public returns (bool) {
-        uint256 nextIndex = INfmSwap(address(_Controller._getSwap()))
-            .returnLastSwapingIndex();
-        if (nextIndex == 0) {
-            if (_CoinArrLength > 0) {
-                Index = _CoinArrLength - 1;
-            }
-        } else {
-            Index = nextIndex - 1;
+        Index++;
+        if (Index == _CoinArrLength) {
+            Index = 0;
         }
-        return false;
+        return true;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -407,6 +415,9 @@ contract NFMExtraBonus {
         _updateIndex();
         if (IERC20(address(_CoinsArray[Index])).balanceOf(address(this)) > 0) {
             makeCalc();
+            _totalpaid[_CoinsArray[Index]] += IERC20(
+                address(_CoinsArray[Index])
+            ).balanceOf(address(this));
             return true;
         } else {
             return false;
@@ -483,7 +494,7 @@ contract NFMExtraBonus {
             uint256 CoinAmount = IERC20(_CoinsArray[Index]).balanceOf(
                 address(this)
             );
-            if (CoinAmount == 0) {
+            if (CoinAmount > 0) {
                 if (percent == true) {
                     //makeCalcs on Percentatge
                     uint256 AmountToSend = SafeMath.div(
