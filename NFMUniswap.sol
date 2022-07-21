@@ -536,7 +536,7 @@ contract NFMUniswap {
     address[] public _CoinsArray;
     uint256 public Index = 0;
     uint256 public Schalter = 0;
-    uint256 public finalizer;
+    bool public finalizer = false;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     uint256 _RemoveLPCounter    => Counts added Structs 
@@ -720,7 +720,7 @@ contract NFMUniswap {
     are made in 10 events.
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function inicialiseRedeemLPToken() public onlyOwner returns (bool) {
+    function inicialiseRedeemLPToken() internal virtual returns (bool) {
         if (Index >= returnCurrencyArrayLenght()) {
             Index = 0;
         }  
@@ -730,11 +730,11 @@ contract NFMUniswap {
                 (,  address UV2Pair) = returnLPBalance(_CoinsArray[Index]);
                 _UV2Pair=UV2Pair;
                 nextRedeemption=RDLP10Amount[_CoinsArray[Index]];
-                finalizer=0;
+                
                 return true;                
             }else{
                 nextRedeemption=0;
-                finalizer++;
+                
                 return false;
             }
         }else{
@@ -780,13 +780,17 @@ contract NFMUniswap {
             }
         } 
     }
+    function updateFinal() public onlyOwner returns (bool){
+        finalizer=true;
+        return true;
+    }
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @updateMapAmounts() returns (bool);
     This function is responsible for paying out the liquidity. Returns are not paid out.
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function updateMapAmounts() public onlyOwner returns (bool){
+    function updateMapAmounts() internal virtual returns (bool){
         _totalLPS[_CoinsArray[Index]]-=nextRedeemption;
         //Check if returns are profit or not
         uint256 ReturnedCoinValue=IERC20(address(_CoinsArray[Index])).balanceOf(address(this));
@@ -819,7 +823,7 @@ contract NFMUniswap {
     This function initiates the withdrawal from the Uniswap pool against LP tokens.
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function removeLiquidity() public virtual onlyOwner returns (bool) {
+    function removeLiquidity() internal virtual returns (bool) {
         if (nextRedeemption > 0 && _totalLPS[_CoinsArray[Index]] > 0 && INfmTimer(address(_Controller._getTimer()))
                     ._getUV2_RemoveLiquidityTime() <= block.timestamp) {
                     //Approve LP Token to Router
@@ -872,7 +876,7 @@ contract NFMUniswap {
     30% Governance
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function calculatingreturns() public onlyOwner returns (bool) {
+    function calculatingreturns() internal virtual returns (bool) {
         //Check if returns are profit or not
         uint256 ReturnedCoinValue=IERC20(address(_CoinsArray[Index])).balanceOf(address(this));
         //if totalLiquidity = 0 and totalLiquiditySet = false, then all further amounts are profits 
@@ -899,7 +903,7 @@ contract NFMUniswap {
     80% NFM Treasury
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function distnfmBal() public onlyOwner returns (bool) {
+    function distnfmBal() internal virtual returns (bool) {
         //Check if returns are profit or not
         uint256 ReturnedCoinValue=IERC20(address(_Controller._getNFM())).balanceOf(address(this)); 
         if(ReturnedCoinValue > 0){
@@ -923,8 +927,7 @@ contract NFMUniswap {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function redeemLPToken() public onlyOwner returns (bool) {
-        if(finalizer>=30){
-            updateNext();
+        if(finalizer==true){
             return false;
         }
         if (Schalter == 0) {
