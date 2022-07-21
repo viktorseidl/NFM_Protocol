@@ -160,12 +160,13 @@ contract NFMMinting {
     _datamintCount                         => Counts all daily minting events.
     _YearlyEmissionAmount            => Sums up all minting amounts within a year for the calculation. Will be reset to 0 at the end of a year.
     _BonusAmount                          => Minting Bonus paid to the executer
+    _locked                                      => Reentrancy Safety
     struct Mintings                          => Contains information about the respective minting
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 private _MonthlyEmissionCount = 1;
     uint256 private _DailyEmissionCount;
-    uint256 private _dailyBNFTAmount;
+    uint256 private _dailyBNFTAmount = 0;
     uint256 private _datamintCount = 0;
     uint256 private _YearlyEmissionAmount;
     uint256 private _BonusAmount = 10 * 10**18;
@@ -197,21 +198,6 @@ contract NFMMinting {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     MODIFIER
-    onlyOwner       => Only Controller listed Contracts and Owner can interact with this contract.
-     */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    modifier onlyOwner() {
-        require(
-            _Controller._checkWLSC(_SController, msg.sender) == true ||
-                _Owner == msg.sender,
-            "oO"
-        );
-        require(msg.sender != address(0), "0A");
-        _;
-    }
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    MODIFIER
     reentrancyGuard       => secures the protocol against reentrancy attacks
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -228,7 +214,6 @@ contract NFMMinting {
         INfmController Cont = INfmController(Controller);
         _Controller = Cont;
         _DailyEmissionCount = 0;
-        _dailyBNFTAmount = 0;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -240,10 +225,15 @@ contract NFMMinting {
     function _updateBNFTAmount(address minter)
         public
         virtual
-        onlyOwner
         reentrancyGuard
         returns (bool)
     {
+        require(
+            _Controller._checkWLSC(_SController, msg.sender) == true ||
+                _Owner == msg.sender,
+            "oO"
+        );
+        require(msg.sender != address(0), "0A");
         if (
             block.timestamp <
             INfmTimer(address(_Controller._getTimer()))._getEndMintTime()
@@ -286,11 +276,13 @@ contract NFMMinting {
     This function is responsible for mapping the minting
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function storeMint(address Sender, uint256 amount)
-        internal
-        virtual
-        onlyOwner
-    {
+    function storeMint(address Sender, uint256 amount) internal virtual {
+        require(
+            _Controller._checkWLSC(_SController, msg.sender) == true ||
+                _Owner == msg.sender,
+            "oO"
+        );
+        require(msg.sender != address(0), "0A");
         mintingtable[_datamintCount] = Mintings(
             Sender,
             amount,
@@ -330,6 +322,16 @@ contract NFMMinting {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
+    @_returnTotalMintNum() returns (uint256);
+    This function returns the amount of mintings executed.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returnTotalMintNum() public view returns (uint256) {
+        return _datamintCount;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
     @_minting(address sender) returns (bool);
     This function is responsible for executing the minting logic
      */
@@ -337,10 +339,15 @@ contract NFMMinting {
     function _minting(address sender)
         public
         virtual
-        onlyOwner
         reentrancyGuard
         returns (bool)
     {
+        require(
+            _Controller._checkWLSC(_SController, msg.sender) == true ||
+                _Owner == msg.sender,
+            "oO"
+        );
+        require(msg.sender != address(0), "0A");
         (uint256 EYearAmount, uint256 EDayAmount) = INfmTimer(
             address(_Controller._getTimer())
         )._getEA();
@@ -352,7 +359,7 @@ contract NFMMinting {
             amount = SafeMath.add(amount, namount);
             _DailyEmissionCount++;
             _YearlyEmissionAmount += amount;
-            _dailyBNFTAmount = 0;
+            _dailyBNFTAmount = _BonusAmount;
             (
                 uint256 UVamount,
                 uint256 StakeAmount,
@@ -381,6 +388,7 @@ contract NFMMinting {
                 TreasuryAmount
             ); //15%
             IERC20(address(_Controller._getNFM()))._mint(sender, _BonusAmount);
+            _dailyBNFTAmount = _BonusAmount;
             storeMint(sender, amount);
             INfmTimer(address(_Controller._getTimer()))._updateDailyMint();
             emit Mint(address(0), sender, block.timestamp, EDayAmount);
@@ -399,7 +407,7 @@ contract NFMMinting {
                 _DailyEmissionCount++;
                 _YearlyEmissionAmount += amount;
             }
-            _dailyBNFTAmount = 0;
+            _dailyBNFTAmount = _BonusAmount;
             (
                 uint256 UVamount,
                 uint256 StakeAmount,

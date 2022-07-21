@@ -679,6 +679,51 @@ contract NFMLiquidity {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
+    @_returnLastLiquidityDate(address Coin) returns (uint256 lastLiquifyDate);
+    This function returns the last timestamp when Liquidity was added to the pool on a specific Coin address
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returnLastLiquidityDate(address Coin)
+        public
+        view
+        returns (uint256 lastLiquifyDate)
+    {
+        for (uint256 i = 0; i < returnCurrencyArrayLenght(); i++) {
+            if (_CoinsArray[i] == Coin) {
+                return _lastLiquidityDate[_CoinsArray[i]];
+            }
+        }
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_returnLPBalanceUV2(address Coin) returns (uint256 LPBalance);
+    This function returns the total amount of LP Tokens for a specific Coin locked in the UV2Contract.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returnLPBalanceUV2(address Coin)
+        public
+        view
+        returns (uint256 LPBalance)
+    {
+        for (uint256 i = 0; i < returnCurrencyArrayLenght(); i++) {
+            if (_CoinsArray[i] == Coin) {
+                address _UV2Pair = IUniswapV2Factory(
+                    IUniswapV2Router02(_uniswapV2Router).factory()
+                ).getPair(
+                        address(_Controller._getNFM()),
+                        address(_CoinsArray[i])
+                    );
+                uint256 LP = IERC20(address(_UV2Pair)).balanceOf(
+                    address(_Controller._getUV2Pool())
+                );
+                return LP;
+            }
+        }
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
     @_returnFullLiquidityArray(uint256 Elements) returns (Array);
     This function returns all stored liquidity supply information
      */
@@ -787,18 +832,14 @@ contract NFMLiquidity {
                     address(_Controller._getUV2Pool())
                 ),
                 2
-            ) > _MinNFM
+            ) >
+            _MinNFM &&
+            IERC20(address(_CoinsArray[Index])).balanceOf(
+                address(_Controller._getUV2Pool())
+            ) >
+            0
         ) {
-            //Get full Coin balance
-            if (
-                IERC20(address(_CoinsArray[Index])).balanceOf(
-                    address(_Controller._getUV2Pool())
-                ) > 0
-            ) {
-                return true;
-            } else {
-                return false;
-            }
+            return true;
         } else {
             return false;
         }
@@ -852,78 +893,40 @@ contract NFMLiquidity {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function putLiquidity() public onlyOwner returns (bool) {
-        if (_lastLiquidityDate[_CoinsArray[Index]] > 0) {
-            uint256 AmountTA = IERC20(address(_Controller._getNFM())).balanceOf(
-                address(this)
-            );
-            uint256 AmountTB = IERC20(address(_CoinsArray[Index])).balanceOf(
-                address(this)
-            );
+        uint256 AmountTA = IERC20(address(_Controller._getNFM())).balanceOf(
+            address(this)
+        );
+        uint256 AmountTB = IERC20(address(_CoinsArray[Index])).balanceOf(
+            address(this)
+        );
 
-            (uint256 amountA, uint256 amountB, uint256 liquidity) = _uniswapV2Router
-                .addLiquidity(
-                    address(_Controller._getNFM()),
-                    address(_CoinsArray[Index]),
-                    AmountTA,
-                    AmountTB,
-                    0, // slippage is unavoidable
-                    0, // slippage is unavoidable
-                    address(this),
-                    block.timestamp + 1
-                );
-            _totalLiquidity[_Controller._getNFM()] += amountA;
-            _totalLiquidity[_CoinsArray[Index]] += amountB;
-            _LiquidityCounter++;
-            _storeLiquidity(
-                amountA,
-                amountB,
-                liquidity,
-                address(_CoinsArray[Index])
-            );
-            emit Liquidity(
-                address(_CoinsArray[Index]),
+        (uint256 amountA, uint256 amountB, uint256 liquidity) = _uniswapV2Router
+            .addLiquidity(
                 address(_Controller._getNFM()),
-                amountB,
-                amountA
-            );
-            return true;
-        } else {
-            uint256 AmountTA = IERC20(address(_Controller._getNFM())).balanceOf(
-                address(this)
-            );
-            uint256 AmountTB = IERC20(address(_CoinsArray[Index])).balanceOf(
-                address(this)
-            );
-
-            (uint256 amountA, uint256 amountB, uint256 liquidity) = _uniswapV2Router
-                .addLiquidity(
-                    address(_Controller._getNFM()),
-                    address(_CoinsArray[Index]),
-                    AmountTA,
-                    AmountTB,
-                    0, // slippage is unavoidable
-                    0, // slippage is unavoidable
-                    address(this),
-                    block.timestamp + 1
-                );
-            _totalLiquidity[_Controller._getNFM()] += amountA;
-            _totalLiquidity[_CoinsArray[Index]] += amountB;
-            _LiquidityCounter++;
-            _lastLiquidityDate[_CoinsArray[Index]] = block.timestamp;
-            _storeLiquidity(
-                amountA,
-                amountB,
-                liquidity,
-                address(_CoinsArray[Index])
-            );
-            emit Liquidity(
                 address(_CoinsArray[Index]),
-                address(_Controller._getNFM()),
-                amountB,
-                amountA
+                AmountTA,
+                AmountTB,
+                0, // slippage is unavoidable
+                0, // slippage is unavoidable
+                address(this),
+                block.timestamp + 1
             );
-            return true;
-        }
+        _totalLiquidity[_Controller._getNFM()] += amountA;
+        _totalLiquidity[_CoinsArray[Index]] += amountB;
+        _lastLiquidityDate[_CoinsArray[Index]] = block.timestamp;
+        _storeLiquidity(
+            amountA,
+            amountB,
+            liquidity,
+            address(_CoinsArray[Index])
+        );
+        emit Liquidity(
+            address(_CoinsArray[Index]),
+            address(_Controller._getNFM()),
+            amountB,
+            amountA
+        );
+        return true;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -951,17 +954,13 @@ contract NFMLiquidity {
     This function is responsible for executing the logic in several steps. This is intended to reduce the gas fees per transaction.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _addLiquidity()
-        public
-        virtual
-        onlyOwner
-        reentrancyGuard
-        returns (bool)
-    {
-        /*if (
-            (INfmTimer(address(_Controller._getTimer()))._getStartTime() +
-                (3600 * 24 * 30 * 12 * 11)) > block.timestamp
-        ) {**/
+    function _addLiquidity() public virtual reentrancyGuard returns (bool) {
+        require(
+            _Controller._checkWLSC(_SController, msg.sender) == true ||
+                _Owner == msg.sender,
+            "oO"
+        );
+        require(msg.sender != address(0), "0A");
         if (Schalter == 0) {
             if (_updateCurrenciesList() == true) {
                 if (checkliquidityAmount() == true) {
@@ -975,38 +974,13 @@ contract NFMLiquidity {
                 return false;
             }
         } else if (Schalter == 1) {
-            if (
-                INfmUV2Pool(address(_Controller._getUV2Pool()))._getWithdraw(
-                    address(_CoinsArray[Index]),
-                    address(this),
-                    0,
-                    false
-                ) == true
-            ) {
+            if (getBalances() == true) {
                 Schalter = 2;
                 return true;
             } else {
                 return false;
             }
         } else if (Schalter == 2) {
-            if (
-                INfm(address(_Controller._getNFM()))._UV2NFMHandler(
-                    address(_Controller._getUV2Pool()),
-                    address(this),
-                    SafeMath.div(
-                        IERC20(address(_Controller._getNFM())).balanceOf(
-                            address(_Controller._getUV2Pool())
-                        ),
-                        2
-                    )
-                ) == true
-            ) {
-                Schalter = 3;
-                return true;
-            } else {
-                return false;
-            }
-        } else if (Schalter == 3) {
             if (
                 IERC20(address(_Controller._getNFM())).approve(
                     _URouter,
@@ -1019,20 +993,15 @@ contract NFMLiquidity {
                     _URouter,
                     IERC20(address(_CoinsArray[Index])).balanceOf(address(this))
                 ) ==
-                true
+                true &&
+                putLiquidity() == true
             ) {
-                Schalter = 4;
+                Schalter = 3;
                 return true;
             } else {
                 return false;
             }
-        } else if (Schalter == 4) {
-            if (putLiquidity() == true) {
-                Schalter = 5;
-                return true;
-            }
-            return false;
-        } else if (Schalter == 5) {
+        } else if (Schalter == 3) {
             uint256 AmountTA = IERC20(address(_Controller._getNFM())).balanceOf(
                 address(this)
             );
@@ -1042,9 +1011,6 @@ contract NFMLiquidity {
                     AmountTA
                 );
             }
-            Schalter = 6;
-            return true;
-        } else if (Schalter == 6) {
             uint256 AmountTB = IERC20(address(_CoinsArray[Index])).balanceOf(
                 address(this)
             );
@@ -1054,9 +1020,6 @@ contract NFMLiquidity {
                     AmountTB
                 );
             }
-            Schalter = 7;
-            return true;
-        } else if (Schalter == 7) {
             address _UV2Pair = IUniswapV2Factory(
                 IUniswapV2Router02(_uniswapV2Router).factory()
             ).getPair(
@@ -1070,9 +1033,9 @@ contract NFMLiquidity {
                     LP
                 );
             }
-            Schalter = 8;
+            Schalter = 4;
             return true;
-        } else if (Schalter == 8) {
+        } else if (Schalter == 4) {
             if (updateNext() == true) {
                 return true;
             }
@@ -1080,10 +1043,5 @@ contract NFMLiquidity {
         } else {
             return false;
         }
-        /*} else {
-            return false;
-        }*/
     }
 }
-
-//NFM NEEDS TO BE RELOADED AND THEN NEEDS TO BE REINICIATED THE EXCHANGE; UNISWAP AND LIQUIDITY.

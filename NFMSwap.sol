@@ -184,8 +184,6 @@ interface INfmUV2Pool {
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface INfmOracle {
     function _getLatestPrice(address coin) external view returns (uint256);
-
-    function _addtoOracle(address Coin, uint256 Price) external returns (bool);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -521,7 +519,7 @@ interface IUniswapV2Factory {
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /// @title NFMSwap.sol
 /// @author Fernando Viktor Seidl E-mail: viktorseidl@gmail.com
-/// @notice This contract is responsible for the liquidations. Here, NFM are exchanged for other coins to obtain
+/// @notice This contract is responsible for the liquidations. NFM is exchanged for other coins to obtain
 ///                liquidity for further LP tokens.
 /// @dev This extension regulates UniswapV2 swap events every 9 days.
 ///
@@ -557,7 +555,9 @@ contract NFMSwap {
     uint256 private _MinNFM = 1000 * 10**18;
     uint256 private _MaxNFM = 100000 * 10**18;
     uint256 private _SwapingCounter = 0;
-    uint256 private Schalter = 0;
+    uint256 public _NFMPricing;
+    uint256 public NextNFMSwapAmount;
+    uint256 public Schalter = 0;
     IUniswapV2Router02 public _uniswapV2Router;
     address private _URouter;
     address private _OracleAdr;
@@ -606,7 +606,8 @@ contract NFMSwap {
     constructor(
         address Controller,
         address Router,
-        address NFMOracle
+        address NFMOracle,
+        uint256 NFMPricing
     ) {
         _Owner = msg.sender;
         INfmController Cont = INfmController(Controller);
@@ -616,6 +617,7 @@ contract NFMSwap {
         IUniswapV2Router02 uniswapV2Router = IUniswapV2Router02(Router);
         _uniswapV2Router = uniswapV2Router;
         _OracleAdr = NFMOracle;
+        _NFMPricing = NFMPricing;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -626,6 +628,17 @@ contract NFMSwap {
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function returnBalanceContract(address Coin) public view returns (uint256) {
         return IERC20(address(Coin)).balanceOf(address(this));
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_updateNFMPricing(uint256 price) returns (bool);
+    This function updates Pricing.
+     */
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _updateNFMPricing(uint256 price) public onlyOwner returns (bool) {
+        _NFMPricing = price;
+        return true;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -765,26 +778,46 @@ contract NFMSwap {
     function startSwapLogic() public virtual onlyOwner returns (bool) {
         //Get full NFM balance
         _updateCurrenciesList();
+        if (Index >= returnCurrencyArrayLenght()) {
+            Index = 0;
+        }
         uint256 NFMTotalSupply = IERC20(address(_Controller._getNFM()))
             .balanceOf(_Controller._getUV2Pool());
-
-        if (SafeMath.div(NFMTotalSupply, 2) > _MinNFM) {
-            uint256 latestprice = INfmOracle(_OracleAdr)._getLatestPrice(
-                _CoinsArray[Index]
-            );
-            INfmOracle(_OracleAdr)._addtoOracle(
-                _CoinsArray[Index],
-                latestprice
-            );
-            (, uint256 AmountTA, , , ) = INfmExchange(
-                address(_Controller._getExchange())
-            ).calcNFMAmount(
-                    _CoinsArray[Index],
-                    getamountOutOnSwap(SafeMath.div(NFMTotalSupply, 2)),
-                    latestprice
+        if (NFMTotalSupply > 0) {
+            if (SafeMath.div(NFMTotalSupply, 2) > _MinNFM) {
+                uint256 TAAmount = getamountOutOnSwap(
+                    SafeMath.div(NFMTotalSupply, 2)
                 );
-            if (AmountTA > _MinNFM) {
-                return true;
+                uint256 latestprice = INfmOracle(_OracleAdr)._getLatestPrice(
+                    _CoinsArray[Index]
+                );
+                uint256 TAAmount18;
+                if (IERC20(address(_CoinsArray[Index])).decimals() < 18) {
+                    TAAmount18 = SafeMath.mul(
+                        TAAmount,
+                        10 **
+                            SafeMath.sub(
+                                18,
+                                IERC20(address(_CoinsArray[Index])).decimals()
+                            )
+                    );
+                } else {
+                    TAAmount18 = TAAmount;
+                }
+                uint256 TAUSDAmount = SafeMath.div(
+                    SafeMath.mul(TAAmount18, latestprice),
+                    10**6
+                );
+                //Pricing must be the amount of NFM for 1 Dollar
+                NextNFMSwapAmount = SafeMath.div(
+                    SafeMath.mul(TAUSDAmount, _NFMPricing),
+                    10**18
+                );
+                if (NextNFMSwapAmount > _MinNFM) {
+                    return true;
+                } else {
+                    return false;
+                }
             } else {
                 return false;
             }
@@ -796,29 +829,21 @@ contract NFMSwap {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @getBalances() returns (bool);
-    This function stores balances for the upcoming Liquidity event once. 
+    This function gets balances for the upcoming Liquidity event once. 
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function getBalances() public onlyOwner returns (bool) {
         uint256 AmountTA = IERC20(address(_Controller._getNFM())).balanceOf(
-            address(this)
+            address(_Controller._getUV2Pool())
         );
         if (AmountTA > 0) {
             if (
                 INfmUV2Pool(address(_Controller._getUV2Pool()))._getWithdraw(
-                    _CoinsArray[Index],
+                    _Controller._getNFM(),
                     address(this),
                     0,
                     false
-                ) ==
-                true &&
-                INfmUV2Pool(address(_Controller._getUV2Pool()))._getWithdraw(
-                    _Controller._getNFM(),
-                    address(this),
-                    50,
-                    true
-                ) ==
-                true
+                ) == true
             ) {
                 return true;
             } else {
@@ -832,36 +857,36 @@ contract NFMSwap {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @returnfunds() returns (bool);
-    This function sends the remaining credits back to the UV2Pool and 10% are sended to the Bonus Extension fpr upcomming 
+    This function sends the remaining credits back to the UV2Pool and 10% are sended to the Bonus Extension for upcomming 
     Bonus Events.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function returnfunds() public onlyOwner returns (bool) {
-        uint256 AmountTA = IERC20(address(_Controller._getNFM())).balanceOf(
-            address(this)
-        );
         uint256 AmountTB = IERC20(address(_CoinsArray[Index])).balanceOf(
             address(this)
         );
 
-        if (AmountTA > 0) {
-            IERC20(address(_Controller._getNFM())).transfer(
-                _Controller._getUV2Pool(),
-                AmountTA
-            );
-        }
         uint256 BonusAmount = SafeMath.div(AmountTB, 10);
+        (address Bonus, ) = _Controller._getBonusBuyBack();
         if (AmountTB > 0) {
-            IERC20(address(_CoinsArray[Index])).transfer(
-                _Controller._getUV2Pool(),
-                (AmountTB - BonusAmount)
-            );
-            // 10% of each Swap is reserved for the Bonus Event on the NFM Community
-            // will be released to the NFM Community every 100 days.
-            (address Bonus, ) = _Controller._getBonusBuyBack();
-            IERC20(address(_CoinsArray[Index])).transfer(Bonus, BonusAmount);
+            if (
+                IERC20(address(_CoinsArray[Index])).transfer(
+                    _Controller._getUV2Pool(),
+                    SafeMath.sub(AmountTB, BonusAmount)
+                ) ==
+                true &&
+                IERC20(address(_CoinsArray[Index])).transfer(
+                    Bonus,
+                    BonusAmount
+                ) ==
+                true
+            ) {
+                return true;
+            } else {
+                return false;
+            }
         }
-        return true;
+        return false;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -886,9 +911,11 @@ contract NFMSwap {
         address[] memory path = new address[](2);
         path[0] = address(_Controller._getNFM());
         path[1] = address(_CoinsArray[Index]);
+
         uint256 OBalA = IERC20(address(_Controller._getNFM())).balanceOf(
             address(this)
         );
+
         if (OBalA > 0) {
             uint256 OBalB = IERC20(address(_CoinsArray[Index])).balanceOf(
                 address(this)
@@ -911,8 +938,8 @@ contract NFMSwap {
                 uint256 NBalB = IERC20(address(_CoinsArray[Index])).balanceOf(
                     address(this)
                 );
-                uint256 AmountA = 0;
-                uint256 AmountB = 0;
+                uint256 AmountA;
+                uint256 AmountB;
                 if (NBalA == 0) {
                     AmountA = OBalA;
                 } else {
@@ -934,11 +961,9 @@ contract NFMSwap {
                 );
                 return true;
             } else {
-                updateSchalter();
                 return false;
             }
         } else {
-            updateSchalter();
             return false;
         }
     }
@@ -993,14 +1018,18 @@ contract NFMSwap {
                 if (makeSwap() == true) {
                     Schalter = 3;
                     return true;
+                } else {
+                    updateNext();
+                    return true;
                 }
-                return false;
             } else if (Schalter == 3) {
                 if (returnfunds() == true) {
                     Schalter = 4;
                     return true;
+                } else {
+                    updateNext();
+                    return true;
                 }
-                return false;
             } else if (Schalter == 4) {
                 if (updateNext() == true) {
                     return true;

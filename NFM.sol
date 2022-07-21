@@ -374,7 +374,6 @@ contract NFM {
     /*
     SECURITY ATTRIBUTES
     _paused        => Pausing can only be commissioned by the Dao.
-    _locked         => ReentrancyGuard variable. Secures the protocol against reentrancy attacks
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 private _paused;
@@ -555,7 +554,7 @@ contract NFM {
         //--------------------------------------------------------------------------------------------
         /**
         IF ADDRESS IS WHITELISTED
-        THEN DON'T APPLY LOGIC 
+        THEN DON'T APPLY LOGIC SMART CONTRACT IS CALLING
         */
         //--------------------------------------------------------------------------------------------
         if (_Controller._checkWLSC(_SController, msg.sender) == true) {
@@ -597,7 +596,7 @@ contract NFM {
 
             //--------------------------------------------------------------------------------------------
             /**
-            INICIALIZE TIMER INTERFACE FOR ALL OTHER EXTENSION CHECKS
+            INICIALIZE TIMER INTERFACE FOR ALL OTHER EXTENSION-CHECKS
              */
             //--------------------------------------------------------------------------------------------
             INfmTimer Timer = INfmTimer(_Controller._getTimer());
@@ -605,13 +604,12 @@ contract NFM {
             //--------------------------------------------------------------------------------------------
             /**
             CHECK IF THE LOGIC OF THE PROTOCOL HAS BEEN INICIALIZED, IF NOT THEN
-            NO EXTENSIONS  CAN BE APPLIED
+            NO EXTENSIONS  CAN BE APPLIED (TOKEN IS ALREADY ON
              */
             //--------------------------------------------------------------------------------------------
             if (
                 Timer._getStartTime() > 0 &&
-                Timer._getLogicCountdown() > 0 &&
-                Timer._getLogicCountdown() < block.timestamp
+                Timer._getStartTime() < block.timestamp
             ) {
                 //--------------------------------------------------------------------------------------------
                 /**
@@ -1070,14 +1068,13 @@ contract NFM {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _burn(address account, uint256 amount) internal virtual {
         require(account != address(0), "0A");
-
         uint256 accountBalance = _balances[account];
         require(accountBalance >= amount, "A>B");
         unchecked {
             _balances[account] = SafeMath.sub(accountBalance, amount);
         }
         _BonusTracker[account] = _balances[account];
-        _TotalSupply -= amount;
+        _TotalSupply = SafeMath.sub(_TotalSupply, amount);
         emit Burning(account, address(0), amount, block.timestamp);
         emit Transfer(account, address(0), amount);
     }
