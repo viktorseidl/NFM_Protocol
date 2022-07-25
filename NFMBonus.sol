@@ -105,6 +105,8 @@ interface INfmTimer {
     function _getEndExtraBonusAllTime() external view returns (uint256);
 
     function _getStartTime() external view returns (uint256);
+
+    function _updateExtraBonusAll() external returns (bool);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -175,7 +177,7 @@ interface INfmSwap {
 ///             Amount available for distribution / NFM total supply = X
 ///         -   The distribution happens automatically during the transaction. As soon as an NFM owner makes a transfer within the bonus window,
 ///             the bonus will automatically be calculated on his 24 hours NFM balance and credited to his account. The NFM owner is informed about upcoming
-///             special payments via the homepage. A prerequisite for participation in the bonus payments is a minimum balance of 250 NFM on the
+///             special payments via the homepage. A prerequisite for participation in the bonus payments is a minimum balance of 150 NFM on the
 ///             participant's account.
 ///         -   The currencies to be paid out are based on the NfmUniswapV2 protocol.
 ///         -   The payout window is set to 24 hours. Every NFM owner who makes a transfer within this time window will automatically have his share
@@ -204,6 +206,9 @@ contract NFMExtraBonus {
     _Index                  => Counter of Swap
     Schalter                => regulates the execution of the swap for the bonus
     CoinProNFM              => Payout Amount for an NFM
+    PayoutRule              => Responsible for the withdraw algorithm
+    nextcounter             => Savety lock. Cancels further bonus trials after 3 failed attempts 
+    _locked                 => Reentrancy Lock
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 public _CoinArrLength;
@@ -212,6 +217,8 @@ contract NFMExtraBonus {
     uint256 private Schalter = 0;
     uint256 private CoinProNFM;
     uint256 private PayoutRule = 0;
+    uint256 private nextcounter = 0;
+    uint256 private _locked = 0;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     MAPPINGS
@@ -249,6 +256,18 @@ contract NFMExtraBonus {
         require(msg.sender != address(0), "0A");
         _;
     }
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    MODIFIER
+    reentrancyGuard       => secures the protocol against reentrancy attacks
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    modifier reentrancyGuard() {
+        require(_locked == 0);
+        _locked = 1;
+        _;
+        _locked = 0;
+    }
 
     constructor(address Controller) {
         _Owner = msg.sender;
@@ -275,10 +294,16 @@ contract NFMExtraBonus {
         return true;
     }
 
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @addCoinToArray(address Coin) returns (bool);
+    This function allows you to add more coins as soon as the Uniswap protocol has expired.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function addCoinToArray(address Coin) public onlyOwner returns (bool) {
         if (
             (INfmTimer(address(_Controller._getTimer()))._getStartTime() +
-                (3600 * 24 * 30 * 12 * 11)) < block.timestamp
+                (3600 * 24 * 30 * 12 * 8)) < block.timestamp
         ) {
             _CoinsArray.push(Coin);
             _CoinArrLength++;
@@ -307,7 +332,7 @@ contract NFMExtraBonus {
     This function updates the payout index to the last used index in the swap protocol
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _updateIndex() public returns (bool) {
+    function _updateIndex() public onlyOwner returns (bool) {
         Index++;
         if (Index == _CoinArrLength) {
             Index = 0;
@@ -418,19 +443,43 @@ contract NFMExtraBonus {
             _totalpaid[_CoinsArray[Index]] += IERC20(
                 address(_CoinsArray[Index])
             ).balanceOf(address(this));
+            if (nextcounter > 0) {
+                nextcounter = 0;
+            }
             return true;
         } else {
+            nextcounter++;
             return false;
         }
     }
 
-    function _getBonus(address Sender) public onlyOwner returns (bool) {
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_getBonus(address Sender) returns (bool);
+    This function is responsible for executing the bonus algorithm.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _getBonus(address Sender)
+        public
+        onlyOwner
+        reentrancyGuard
+        returns (bool)
+    {
         if (Schalter == 0) {
             if (_startBonusLogic() == true) {
                 Schalter = 1;
                 return true;
+            } else {
+                if (nextcounter < 4) {
+                    return false;
+                } else {
+                    nextcounter = 0;
+                    updateSchalter();
+                    INfmTimer(address(_Controller._getTimer()))
+                        ._updateExtraBonusAll();
+                    return false;
+                }
             }
-            return false;
         } else {
             if (CoinProNFM > 0) {
                 if (

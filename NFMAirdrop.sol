@@ -188,42 +188,23 @@ contract NFMAirdrop {
     struct Airdrop                          => Contains important information for checking non-ido airdrops
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    uint256 public allCoinsCounter = 0;
-    uint256 public lastRoundCounter = 0;
-    uint256 public nextRoundCounter = 0;
-    uint256 private Schalter = 0;
-    uint256 public PayOutCounter = 1;
-    uint256 private _locked = 0;
-    address[] private AirdropCoins;
-    bool private threeAirdrops = true;
     struct Airdrop {
         string Webpage;
         string Description;
         string Logo;
     }
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    MAPPINGS
-    _wasPaidCheck (Owner address, ending Timestamp of Airdrop);         //Records when payments have been made
-    _totalBalCoin (ERC20 address => Total amount of Airdrop);                 //Records the balance of the airdrop
-    _CoinWLDao (ERC20 address => true 
-    if accepted false if denied));                                                                  //Records whether the coin has been approved
-    _AirdropInfo (ERC20 address => Struct Info about the Token);            //Records information about the Project to be reviewed.
-    _WLRegistry (Owner => ERC20 address);                                           //Records the Airdrop Owner of a non-IDO;
-    _CoinforNFM (ERC20 address => Amount per NFM);                          //Shows how many coins are paid out per NFM
-    _CoinAvailable (ERC20 address => true if funds available false 
-    if already done);                                                                                     //Records whether credit is still available
-    _allIdoCoins (CoinCounterNum => ERC20 address);                           //Records the coin index register
-     */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    mapping(address => uint256) private _wasPaidCheck;
-    mapping(address => uint256) private _totalBalCoin;
-    mapping(address => bool) private _CoinWLDao;
-    mapping(address => Airdrop) private _AirdropInfo;
-    mapping(address => address) private _WLRegistry;
-    mapping(address => uint256) private _CoinforNFM;
-    mapping(address => bool) private _CoinAvailable;
-    mapping(uint256 => address) private _allIdoCoins;
+
+    uint256 public AirdropNum = 0; //Actual Airdrop Number
+    uint256 public AirdropNextNumAllowance = 0; //Airdrop Number for allowances (its only 3 Coins allowed per Airdrops. Once 3 Coins are reached the AirdropNextNumAllowance will increase
+    mapping(uint256 => address[]) public _AirdropCoinsOnAirdropNumAllowed; //Airdrop Number => 3 addresses per Airdrop allowed
+    mapping(address => mapping(address => bool)) public _CoinsStatus; //Owner => CoinAddress => true if allowed or false if denied
+    mapping(address => mapping(address => bool)) public _allCoinsOpenRequest; //CoinAddress => Owner => true if accepted or false if open
+    mapping(address => Airdrop) public _AirdropInfo; // Coin Address => Struct
+    mapping(address => uint256) public _wasPaidCheck; // Coin  Address => Time End Event
+    mapping(address => uint256) public _totalBalCoin; // Coin Address => Full Balance Coin
+    mapping(address => uint256) public _CoinforNFM; // Coin Address => Coins for 1 NFM calculations
+    address[] public AllCoinsArray;
+    uint256 public _locked = 0;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     CONTRACT EVENTS
@@ -288,18 +269,17 @@ contract NFMAirdrop {
     This function returns the Token address of an airdrop.
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _showAirdropToken() public view returns (address) {
-        return _WLRegistry[msg.sender];
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @_showAirdropStatus() returns (bool);
-    This function returns the whitelisting status of an airdrop on token Address.
-     */
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _showAirdropStatus(address Coin) public view returns (bool) {
-        return _CoinWLDao[Coin];
+    function _showAirdropToken()
+        public
+        view
+        returns (
+            address,
+            bool,
+            Airdrop memory
+        )
+    {
+        address Coin = _CoinsStatus[msg.sender];
+        return (Coin, _CoinsStatus[msg.sender][Coin], _AirdropInfo[Coin]);
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -308,18 +288,16 @@ contract NFMAirdrop {
     This function gives the index number of the last airdrops paid out. This allows upcoming airdrops to be displayed.
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _showUpComingAirdrops() public view returns (uint256) {
-        return nextRoundCounter;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @_showlastRounds() returns (uint256);
-    This function gives the index number of the last starting point.
-     */
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _showlastRounds() public view returns (uint256) {
-        return lastRoundCounter;
+    function _showUpComingAirdrops()
+        public
+        view
+        returns (address[] memory Arr)
+    {
+        if (_AirdropCoinsOnAirdropNumAllowed[AirdropNum + 1].length == 2) {
+            return _AirdropCoinsOnAirdropNumAllowed[AirdropNum + 1];
+        } else {
+            return [];
+        }
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -329,13 +307,13 @@ contract NFMAirdrop {
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _showAirdropArray() public view returns (address[] memory Arr) {
-        return AirdropCoins;
+        return AllCoinsArray;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_showAirdropInfo(address Coin) returns (Struct);
-    This function returns the all Information about a provided non IDO airdrop.
+    This function returns the all Information about a provided airdrop.
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _showAirdropInfo(address Coin)
@@ -349,7 +327,7 @@ contract NFMAirdrop {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_updateAirdropInfo(address Coin, string memory Website, string memory Tokendescription,string memory Tokenlogo) returns (bool);
-    This function updates Information about the non-IDO Airdrop like token logo, webpage, description
+    This function updates Information about the Airdrop like token logo, webpage, description
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _updateAirdropInfo(
@@ -358,7 +336,7 @@ contract NFMAirdrop {
         string memory Tokendescription,
         string memory Tokenlogo
     ) public returns (bool) {
-        require(_WLRegistry[msg.sender] == Coin, "oO");
+        require(_CoinsStatus[msg.sender] == Coin, "oO");
         _AirdropInfo[Coin] = Airdrop(Website, Tokendescription, Tokenlogo);
         return true;
     }
@@ -384,7 +362,20 @@ contract NFMAirdrop {
      */
     //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _confirmWL(address Coin) public onlyOwner returns (bool) {
-        _CoinWLDao[Coin] = true;
+        address CoinOwner = _allCoinsOpenRequest[Coin];
+        _CoinsStatus[CoinOwner][Coin] = true;
+        _allCoinsOpenRequest[Coin][CoinOwner] = true;
+        if (
+            _AirdropCoinsOnAirdropNumAllowed[_AirdropCoinsOnAirdropNumAllowed]
+                .length == 3
+        ) {
+            _AirdropCoinsOnAirdropNumAllowed++;
+            _AirdropCoinsOnAirdropNumAllowed[_AirdropCoinsOnAirdropNumAllowed]
+                .push(Coin);
+        } else {
+            _AirdropCoinsOnAirdropNumAllowed[_AirdropCoinsOnAirdropNumAllowed]
+                .push(Coin);
+        }
         return true;
     }
 
@@ -401,20 +392,14 @@ contract NFMAirdrop {
         string memory Tokendescription,
         string memory Tokenlogo
     ) public returns (bool) {
-        if (IERC20(address(Coin)).decimals() == 0) {
+        if (IERC20(address(Coin)).decimals() < 6) {
             return false;
         } else {
-            if (_Controller._checkWLSC(_SController, msg.sender) == true) {
-                _CoinWLDao[Coin] = true;
-            } else {
-                _CoinWLDao[Coin] = false;
-                _WLRegistry[msg.sender] = Coin;
-                _AirdropInfo[Coin] = Airdrop(
-                    Website,
-                    Tokendescription,
-                    Tokenlogo
-                );
-            }
+            _CoinsStatus[msg.sender][Coin] = false;
+            _allCoinsOpenRequest[Coin][msg.sender] = false;
+            _AirdropInfo[Coin] = Airdrop(Website, Tokendescription, Tokenlogo);
+            AllCoinsArray.push(Coin);
+
             return true;
         }
     }
@@ -431,11 +416,11 @@ contract NFMAirdrop {
         returns (bool)
     {
         if (
-            _CoinWLDao[Coin] == true &&
+            _allCoinsOpenRequest[Coin][msg.sender] == true &&
             IERC20(address(Coin)).allowance(msg.sender, address(this)) ==
             Amount &&
             IERC20(address(Coin)).allowance(msg.sender, address(this)) >=
-            1000 * 10**IERC20(address(Coin)).decimals()
+            1000 * 10**IERC20(address(Coin)).decimals() &&
         ) {
             require(
                 IERC20(address(Coin)).transferFrom(
@@ -445,37 +430,7 @@ contract NFMAirdrop {
                 ) == true,
                 "<A"
             );
-            if (_addAirDrop(Coin) == true) {
-                return true;
-            }
-            return false;
-        }
-        return false;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @_addAirDrop(address Coin, uint256 Amount) returns (bool);
-    This function finally saves all important data for the airdrop. In order for the airdrop to take place, a non-IDO airdrop must 
-    have the pre-approval of the Dao. 
-     */
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _addAirDrop(address Coin) public onlyOwner returns (bool) {
-        if (
-            _CoinWLDao[Coin] == true &&
-            IERC20(address(Coin)).balanceOf(address(this)) > 0
-        ) {
-            _totalBalCoin[Coin] = IERC20(address(Coin)).balanceOf(
-                address(this)
-            );
-            if (_CoinAvailable[Coin] == false) {
-                _CoinAvailable[Coin] = true;
-            } else {
-                _CoinAvailable[Coin] = true;
-                AirdropCoins.push(Coin);
-            }
-            _allIdoCoins[allCoinsCounter] = Coin;
-            allCoinsCounter++;
+            _totalBalCoin[Coin] += Amount;
             return true;
         }
         return false;
@@ -489,7 +444,11 @@ contract NFMAirdrop {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function makeCalc(address Coin) internal virtual returns (bool) {
-        if (_totalBalCoin[Coin] > 0 && _CoinAvailable[Coin] == true) {
+        address CoinOwner = _allCoinsOpenRequest[Coin];
+        if (
+            _totalBalCoin[Coin] > 0 &&
+            _allCoinsOpenRequest[Coin][CoinOwner] == true
+        ) {
             //Get actual TotalSupply NFM
             uint256 NFMTotalSupply = IERC20(address(_Controller._getNFM()))
                 .totalSupply();

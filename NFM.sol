@@ -224,6 +224,8 @@ interface INfmAirdrop {
 
     function updateSchalter() external returns (bool);
 
+    function checkForAirdrop() external returns (bool);
+
     function _getAirdrop(address Sender) external returns (bool);
 
     function _returnPayoutCounter() external view returns (uint256);
@@ -777,69 +779,22 @@ contract NFM {
                         INfmAirdrop Airdrop = INfmAirdrop(
                             address(_Controller._getAirdrop())
                         );
-                        if (Airdrop._returnPayoutCounter() == 1) {
-                            //Make Withdraw Stake/Treasury 50%/50% Airdrop 1
-                            uint256 lastRound = Airdrop._showlastRounds();
-                            if (
-                                Airdrop._getWithdraw(
-                                    lastRound + 1,
-                                    address(
-                                        _Controller
-                                            ._getNFMStakingTreasuryERC20()
-                                    ),
-                                    address(_Controller._getTreasury())
-                                ) == true
-                            ) {
-                                tlocker = true;
-                            }
-                        } else if (Airdrop._returnPayoutCounter() == 2) {
-                            //Make Withdraw Stake/Treasury 50%/50% Airdrop 2
-                            uint256 lastRound = Airdrop._showlastRounds();
-                            if (
-                                Airdrop._getWithdraw(
-                                    lastRound + 2,
-                                    address(
-                                        _Controller
-                                            ._getNFMStakingTreasuryERC20()
-                                    ),
-                                    address(_Controller._getTreasury())
-                                ) == true
-                            ) {
-                                tlocker = true;
-                            }
-                        } else if (Airdrop._returnPayoutCounter() == 3) {
-                            //Make Withdraw Stake/Treasury 50%/50% Airdrop 3
-                            uint256 lastRound = Airdrop._showlastRounds();
-                            if (
-                                Airdrop._getWithdraw(
-                                    lastRound + 3,
-                                    address(
-                                        _Controller
-                                            ._getNFMStakingTreasuryERC20()
-                                    ),
-                                    address(_Controller._getTreasury())
-                                ) == true
-                            ) {
-                                tlocker = true;
-                            }
-                        } else {
-                            if (Airdrop.updateSchalter() == true) {
-                                Airdrop._resetPayOutCounter();
-                                Timer._updateExtraBonusAirdrop();
-                                tlocker = true;
-                            }
-                        }
+                        //Airdrop has finished withdraw of each coin needs to be done
                     } else {
+                        //Airdrop already in place
+                        INfmAirdrop Airdrop = INfmAirdrop(
+                            address(_Controller._getAirdrop())
+                        );
                         if (
-                            INfmAirdrop(_Controller._getAirdrop())
-                                ._checkPayment(from) !=
+                            Airdrop._checkPayment(from) !=
                             Timer._getEndExtraBonusAirdropTime()
                         ) {
-                            INfmAirdrop Airdrop = INfmAirdrop(
-                                address(_Controller._getAirdrop())
-                            );
-                            if (Airdrop._getAirdrop(from) == true) {
-                                tlocker = true;
+                            if (Airdrop.checkForAirdrop() == true) {
+                                if (Airdrop._getAirdrop(from) == true) {
+                                    tlocker = true;
+                                }
+                            } else {
+                                Timer._updateExtraBonusAirdrop();
                             }
                         }
                     }
