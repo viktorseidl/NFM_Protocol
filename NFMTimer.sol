@@ -189,18 +189,24 @@ contract NFMTimer {
             //Test Bonus
         } else if (timernum == 5) {
             _ExtraBonusAll = btimestamp;
-            //Test BuyBack
+            //Test Bonus
         } else if (timernum == 6) {
+            _ExtraBonusAllEnd = btimestamp;
+            //Test BuyBack
+        } else if (timernum == 7) {
             _StartBuyBack = btimestamp;
             //Test Burning
-        } else if (timernum == 7) {
+        } else if (timernum == 8) {
             _StartBurn = btimestamp;
             //Test Countdown
-        } else if (timernum == 8) {
+        } else if (timernum == 9) {
             _SetUpLogicCountdown = btimestamp;
             //Test Airdrop
-        } else if (timernum == 9) {
+        } else if (timernum == 10) {
             _ExtraBonusAirdrop = btimestamp;
+        } else if (timernum == 11) {
+            _ExtraBonusAirdropEnd = btimestamp;
+            //Test BuyBack
         }
 
         return true;

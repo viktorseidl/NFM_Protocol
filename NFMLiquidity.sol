@@ -1,7 +1,3 @@
-/**
- *Submitted for verification at polygonscan.com on 2022-07-21
- */
-
 //SPDX-License-Identifier:MIT
 
 pragma solidity ^0.8.13;
@@ -152,14 +148,6 @@ interface INfmOracle {
     function _getLatestPrice(address coin) external view returns (uint256);
 
     function _addtoOracle(address Coin, uint256 Price) external returns (bool);
-}
-
-interface INfm {
-    function _UV2NFMHandler(
-        address from,
-        address to,
-        uint256 amount
-    ) external returns (bool);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

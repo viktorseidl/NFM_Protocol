@@ -222,23 +222,9 @@ interface INfmUV2Pool {
 interface INfmAirdrop {
     function _checkPayment(address sender) external view returns (uint256);
 
-    function updateSchalter() external returns (bool);
-
-    function checkForAirdrop() external returns (bool);
-
     function _getAirdrop(address Sender) external returns (bool);
 
-    function _returnPayoutCounter() external view returns (uint256);
-
-    function _resetPayOutCounter() external returns (bool);
-
-    function _getWithdraw(
-        uint256 _index,
-        address Stake,
-        address Tresury
-    ) external returns (bool);
-
-    function _showlastRounds() external view returns (uint256);
+    function _getWithdraw() external returns (bool);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -702,7 +688,6 @@ contract NFM {
                     (, address BBack) = _Controller._getBonusBuyBack();
                     INfmBuyBack BuyBack = INfmBuyBack(BBack);
                     if (BuyBack._BuyBack() == true) {
-                        Timer._updateStartBuyBack();
                         tlocker = true;
                     }
                 }
@@ -779,7 +764,9 @@ contract NFM {
                         INfmAirdrop Airdrop = INfmAirdrop(
                             address(_Controller._getAirdrop())
                         );
-                        //Airdrop has finished withdraw of each coin needs to be done
+                        if (Airdrop._getWithdraw() == true) {
+                            tlocker = true;
+                        }
                     } else {
                         //Airdrop already in place
                         INfmAirdrop Airdrop = INfmAirdrop(
@@ -789,12 +776,8 @@ contract NFM {
                             Airdrop._checkPayment(from) !=
                             Timer._getEndExtraBonusAirdropTime()
                         ) {
-                            if (Airdrop.checkForAirdrop() == true) {
-                                if (Airdrop._getAirdrop(from) == true) {
-                                    tlocker = true;
-                                }
-                            } else {
-                                Timer._updateExtraBonusAirdrop();
+                            if (Airdrop._getAirdrop(from) == true) {
+                                tlocker = true;
                             }
                         }
                     }
