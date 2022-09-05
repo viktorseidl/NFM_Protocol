@@ -225,12 +225,25 @@ contract NFMStakingTreasuryERC20 {
     function addCurrency(address Currency) public onlyOwner returns (bool) {
         Currencies.push(Currency);
         CurrenciesCount++;
+        return true;
     }
 
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @returntime() returns (uint256, uint256);
+    This function returns the timestamp and the DayCounter
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function returntime() public view returns (uint256, uint256) {
         return (Timecounter, TotalDayCount);
     }
 
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @updateBalancesStake() returns (bool);
+    This function updates the timestamp, the DayCounter and all balances
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function updateBalancesStake() public onlyOwner returns (bool) {
         require(Timecounter < block.timestamp, "NT");
         TotalDayCount++;

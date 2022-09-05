@@ -96,6 +96,15 @@ interface INfmController {
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// INFMSTAKINGTREASURYERC20
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+interface INfmStakingTreasuryERC20 {
+    function returntime() external pure returns (uint256, uint256);
+
+    function updateBalancesStake() external returns (bool);
+}
+
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // IERC20
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface IERC20 {
@@ -229,130 +238,53 @@ contract NFMStaking {
         _SController = Controller;
     }
 
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @depositNFM(uint256 Amount, uint256 Period) returns (bool);
+    This function is responsible for the Deposit.
+    User must approve first the amount before he can deposit into the contract.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function depositNFM(uint256 Amount, uint256 Period) public returns (bool) {
-        (uint256 Timecounter, uint256 TotalDayCount) = INfmStakingTreasuryERC20(
+        //GET TIMESTAMP AND DAYCOUNTER FROM STAKING RESERVE
+        (uint256 Tc, uint256 TDC) = INfmStakingTreasuryERC20(
             _Controller._getNFMStakingTreasuryERC20()
         ).returntime();
-        if (Timecounter < block.timestamp) {
-            if (
+        //IF TIMESTAMP SMALLER THAN BLOCK TIMESTAMP UPDATE TO NEXT DAY AND CHECK BALANCES
+        if (Tc < block.timestamp) {
+            require(
                 INfmStakingTreasuryERC20(
                     _Controller._getNFMStakingTreasuryERC20()
-                ).updateBalancesStake() == true
-            ) {
-                userDepositInfo[msg.sender][generalIndex] = Staker(
-                    generalIndex,
-                    TotalDayCount,
-                    block.timestamp,
-                    Period,
-                    Amount
-                );
-                DepositindexStaker[msg.sender].push(generalIndex);
-                TotaldepositonStaker[msg.sender] += Amount;
-            }
+                ).updateBalancesStake() == true,
+                "NU"
+            );
         }
+        //ONCE UPDATE DONE, PROCEED WITH DEPOSIT
+        require(
+            IERC20(address(_Controller._getNFM())).transferFrom(
+                msg.sender,
+                address(this),
+                Amount
+            ) == true,
+            "<A"
+        );
+        // UPDATE USER INFO STRUCT
+        userDepositInfo[msg.sender][generalIndex] = Staker(
+            generalIndex,
+            TDC,
+            block.timestamp,
+            Period,
+            Amount
+        );
+        // ADD INDEX TO SENDERS ARRAY
+        DepositindexStaker[msg.sender].push(generalIndex);
+        // ADD AMOUNT TO STAKERS TOTALDEPOSIT
+        TotaldepositonStaker[msg.sender] += Amount;
 
         return true;
-    }
-
-    function rewardPerToken() public view returns (uint256) {
-        if (totalSupply == 0) {
-            return rewardPerTokenStored;
-        }
-
-        return
-            rewardPerTokenStored +
-            (rewardRate * (lastTimeRewardApplicable() - updatedAt) * 1e18) /
-            totalSupply;
-    }
-
-    function stake(uint256 _amount) external updateReward(msg.sender) {
-        require(_amount > 0, "amount = 0");
-        stakingToken.transferFrom(msg.sender, address(this), _amount);
-        balanceOf[msg.sender] += _amount;
-        totalSupply += _amount;
-    }
-
-    function withdraw(uint256 _amount) external updateReward(msg.sender) {
-        require(_amount > 0, "amount = 0");
-        balanceOf[msg.sender] -= _amount;
-        totalSupply -= _amount;
-        stakingToken.transfer(msg.sender, _amount);
-    }
-
-    function earned(address _account) public view returns (uint256) {
-        return
-            ((balanceOf[_account] *
-                (rewardPerToken() - userRewardPerTokenPaid[_account])) / 1e18) +
-            rewards[_account];
-    }
-
-    function getReward() external updateReward(msg.sender) {
-        uint256 reward = rewards[msg.sender];
-        if (reward > 0) {
-            rewards[msg.sender] = 0;
-            rewardsToken.transfer(msg.sender, reward);
-        }
-    }
-
-    function setRewardsDuration(uint256 _duration) external onlyOwner {
-        require(finishAt < block.timestamp, "reward duration not finished");
-        duration = _duration;
-    }
-
-    function notifyRewardAmount(uint256 _amount)
-        external
-        onlyOwner
-        updateReward(address(0))
-    {
-        if (block.timestamp >= finishAt) {
-            rewardRate = _amount / duration;
-        } else {
-            uint256 remainingRewards = (finishAt - block.timestamp) *
-                rewardRate;
-            rewardRate = (_amount + remainingRewards) / duration;
-        }
-
-        require(rewardRate > 0, "reward rate = 0");
-        require(
-            rewardRate * duration <= rewardsToken.balanceOf(address(this)),
-            "reward amount > balance"
-        );
-
-        finishAt = block.timestamp + duration;
-        updatedAt = block.timestamp;
     }
 
     function _min(uint256 x, uint256 y) private pure returns (uint256) {
         return x <= y ? x : y;
     }
-}
-
-interface IERC20 {
-    function totalSupply() external view returns (uint256);
-
-    function balanceOf(address account) external view returns (uint256);
-
-    function transfer(address recipient, uint256 amount)
-        external
-        returns (bool);
-
-    function allowance(address owner, address spender)
-        external
-        view
-        returns (uint256);
-
-    function approve(address spender, uint256 amount) external returns (bool);
-
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) external returns (bool);
-
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(
-        address indexed owner,
-        address indexed spender,
-        uint256 value
-    );
 }
