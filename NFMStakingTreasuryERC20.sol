@@ -167,8 +167,6 @@ contract NFMStakingTreasuryERC20 {
     uint256 public Timecounter;
     //Array of all currencies allowed
     address[] public Currencies;
-    //Counts last updated Currency Index
-    uint256 public CurrenciesCount;
     // Coinaddress => DayCount => Amounttotalavailable for Reward this day Day
     mapping(address => mapping(uint256 => uint256)) public DailyTotalAvailable;
     // Coinaddress => DayCount => rewardPerDayPer1NFM
@@ -226,7 +224,6 @@ contract NFMStakingTreasuryERC20 {
         _SController = Controller;
         Timecounter = block.timestamp + (3600 * 24);
         Currencies.push(address(Cont._getNFM()));
-        CurrenciesCount++;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -237,7 +234,6 @@ contract NFMStakingTreasuryERC20 {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function addCurrency(address Currency) public onlyOwner returns (bool) {
         Currencies.push(Currency);
-        CurrenciesCount++;
         return true;
     }
 
@@ -254,25 +250,48 @@ contract NFMStakingTreasuryERC20 {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @updateBalancesStake() returns (bool);
-    This function updates the timestamp, the DayCounter and all balances
+    This function updates the timestamp, the DayCounter and all balances and is executed min once a day on deposits or claims
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function updateBalancesStake() public onlyOwner returns (bool) {
+        //Only if Timecounter is smaller than timestamp update possible
         require(Timecounter < block.timestamp, "NT");
+<<<<<<< HEAD
         uint256 LastDay = INfmStaking(address(_Controller._getNFMStaking()))
             .returnTotallockedPerDay(TotalDayCount);
+=======
+        //change to the next day
+>>>>>>> ed7127d85167778a0c775fb474a41b31ac09979e
         TotalDayCount++;
+        //add 24 hours to timecounter timestamp
         Timecounter = Timecounter + (3600 * 24);
+        //inicialice uint for calculations
         uint256 balanceContract;
         uint256 cdecimal;
         for (uint256 i = 0; i < Currencies.length; i++) {
+            //Get contract Balance
             balanceContract = IERC20(address(Currencies[i])).balanceOf(
                 address(this)
             );
+<<<<<<< HEAD
             cdecimal = IERC20(address(Currencies[i])).decimals();
             if (
                 balanceContract > TotalsupplyCoinsRewardsandNFM[Currencies[i]]
             ) {
+=======
+            //Only if Contract Balance greater than totalsupply registered, then there will be a new entry
+            if (
+                balanceContract > TotalsupplyCoinsRewardsandNFM[Currencies[i]]
+            ) {
+                //Set daily Available amount for rewards
+                DailyTotalAvailable[Currencies[i]][Timecounter] = SafeMath.sub(
+                    balanceContract,
+                    TotalsupplyCoinsRewardsandNFM[Currencies[i]]
+                );
+                //Check decimals for calculations
+                cdecimal = IERC20(address(Currencies[i])).decimals();
+                //if coin decimals smaller than 18, change format to 36 digits for calculations
+>>>>>>> ed7127d85167778a0c775fb474a41b31ac09979e
                 if (cdecimal < 18) {
                     DailyTotalAvailable[Currencies[i]][Timecounter] = SafeMath
                         .sub(
@@ -295,6 +314,7 @@ contract NFMStakingTreasuryERC20 {
                     ] *
                         10**(18 - cdecimal) *
                         10**18);
+<<<<<<< HEAD
                 } else {
                     DailyTotalAvailable[Currencies[i]][Timecounter] = SafeMath
                         .sub(
@@ -310,17 +330,28 @@ contract NFMStakingTreasuryERC20 {
                     balanceContract = (DailyTotalAvailable[Currencies[i]][
                         TotalDayCount
                     ] * 10**18);
+=======
+                }else{
+                    //change format to 36 digits
+                    balanceContract = (DailyTotalAvailable[Currencies[i]][
+                        Timecounter
+                    ] *
+                        10**18);
+>>>>>>> ed7127d85167778a0c775fb474a41b31ac09979e
                 }
+                //Calculate Dailytotalamount for rewards / total supply nfm
                 balanceContract = SafeMath.div(
                     balanceContract,
                     IERC20(address(_Controller._getNFM())).totalSupply()
                 );
+                // If coin digits smaller than 18, then return digit format to coin format
                 if (cdecimal < 18) {
                     balanceContract = SafeMath.div(
                         balanceContract,
                         10**(18 - cdecimal)
                     );
                 }
+
                 DailyrewardCoinperNFM[Currencies[i]][
                     TotalDayCount
                 ] = balanceContract;
@@ -331,7 +362,7 @@ contract NFMStakingTreasuryERC20 {
         }
         return true;
     }
-
+    function 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @returnSecAmount(address Coin) returns (uint256);
