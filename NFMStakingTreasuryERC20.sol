@@ -97,6 +97,16 @@ interface INfmController {
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// INFMSTAKING
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+interface INfmStaking {
+    function returnTotallockedPerDay(uint256 Index)
+        external
+        view
+        returns (uint256);
+}
+
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // IERC20
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface IERC20 {
@@ -166,6 +176,8 @@ contract NFMStakingTreasuryERC20 {
         public DailyrewardCoinperNFM;
     // Coinaddress => Totalsupply of coins all entries - payouts
     mapping(address => uint256) public TotalsupplyCoinsRewardsandNFM;
+    // Coinaddress => Totalsupply of coins all entries - payouts
+    mapping(address => uint256) public TotalRewardsPaid;
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /* 
@@ -219,7 +231,8 @@ contract NFMStakingTreasuryERC20 {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    Add new currencies
+    @updateBalancesStake() returns (bool);
+    This function updates the timestamp, the DayCounter and all balances
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function addCurrency(address Currency) public onlyOwner returns (bool) {
@@ -246,27 +259,57 @@ contract NFMStakingTreasuryERC20 {
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function updateBalancesStake() public onlyOwner returns (bool) {
         require(Timecounter < block.timestamp, "NT");
+        uint256 LastDay = INfmStaking(address(_Controller._getNFMStaking()))
+            .returnTotallockedPerDay(TotalDayCount);
         TotalDayCount++;
         Timecounter = Timecounter + (3600 * 24);
         uint256 balanceContract;
+        uint256 cdecimal;
         for (uint256 i = 0; i < Currencies.length; i++) {
             balanceContract = IERC20(address(Currencies[i])).balanceOf(
                 address(this)
             );
+            cdecimal = IERC20(address(Currencies[i])).decimals();
             if (
                 balanceContract > TotalsupplyCoinsRewardsandNFM[Currencies[i]]
             ) {
-                DailyTotalAvailable[Currencies[i]][Timecounter] = SafeMath.sub(
-                    balanceContract,
-                    TotalsupplyCoinsRewardsandNFM[Currencies[i]]
-                );
-                uint256 cdecimal = IERC20(address(Currencies[i])).decimals();
                 if (cdecimal < 18) {
+                    DailyTotalAvailable[Currencies[i]][Timecounter] = SafeMath
+                        .sub(
+                            balanceContract,
+                            (TotalsupplyCoinsRewardsandNFM[Currencies[i]] +
+                                SafeMath.div(
+                                    SafeMath.mul(
+                                        (DailyrewardCoinperNFM[Currencies[i]][
+                                            TotalDayCount
+                                        ] *
+                                            10**18 -
+                                            cdecimal),
+                                        LastDay
+                                    ),
+                                    10**18 - cdecimal
+                                ))
+                        );
                     balanceContract = (DailyTotalAvailable[Currencies[i]][
-                        Timecounter
+                        TotalDayCount
                     ] *
                         10**(18 - cdecimal) *
                         10**18);
+                } else {
+                    DailyTotalAvailable[Currencies[i]][Timecounter] = SafeMath
+                        .sub(
+                            balanceContract,
+                            (TotalsupplyCoinsRewardsandNFM[Currencies[i]] +
+                                SafeMath.mul(
+                                    DailyrewardCoinperNFM[Currencies[i]][
+                                        TotalDayCount
+                                    ],
+                                    LastDay
+                                ))
+                        );
+                    balanceContract = (DailyTotalAvailable[Currencies[i]][
+                        TotalDayCount
+                    ] * 10**18);
                 }
                 balanceContract = SafeMath.div(
                     balanceContract,
@@ -279,14 +322,48 @@ contract NFMStakingTreasuryERC20 {
                     );
                 }
                 DailyrewardCoinperNFM[Currencies[i]][
-                    Timecounter
+                    TotalDayCount
                 ] = balanceContract;
                 TotalsupplyCoinsRewardsandNFM[
                     Currencies[i]
-                ] += DailyTotalAvailable[Currencies[i]][Timecounter];
+                ] += DailyTotalAvailable[Currencies[i]][TotalDayCount];
             }
         }
         return true;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @returnSecAmount(address Coin) returns (uint256);
+    This function returns the amount per second
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function returnSecAmount(address Coin) public view returns (uint256) {
+        uint256 perSecond = SafeMath.div(
+            DailyrewardCoinperNFM[Coin][TotalDayCount],
+            86400
+        );
+        return perSecond;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @returnSecAmount(address Coin) returns (uint256);
+    This function returns the amount per second
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function returnDayindex() public view returns (uint256) {
+        return TotalDayCount;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @returnCoinsArray() returns (address[] memory Coins);
+    This function returns the CoinsArray
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function returnCoinsArray() public view returns (address[] memory Coins) {
+        return Currencies;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

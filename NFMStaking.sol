@@ -102,6 +102,8 @@ interface INfmStakingTreasuryERC20 {
     function returntime() external pure returns (uint256, uint256);
 
     function updateBalancesStake() external returns (bool);
+
+    function returnDayindex() external view returns (uint256);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -159,30 +161,8 @@ contract NFMStaking {
     address private _Owner;
     address private _SController;
     uint256 private _locked = 0;
-    /**
-    ERC20reservecontract variables
-    //Counts everyday + 1
-    uint256 public TotalDayCount = 0;
-    //indicates the beginning timestamp
-    uint256 public Timecounter;
-    //Array of all currencies allowed
-    address[] public Currencies;
-    //Counts last updated Currency Index
-    uint256 public CurrenciesCount;
-    //Total Value deposited
-    uint256 public Totallocked;
-    // Coinaddress => DayCount => Amounttotalavailable for Reward this day Day
-    mapping(address => mapping(uint256 => uint256)) public DailyTotalAvailable;
-    // Coinaddress => DayCount => rewardPerDayPer1NFM
-    mapping(address => mapping(uint256 => uint256))
-        public DailyrewardCoinperNFM;
-    // Coinaddress => Totalsupply of coins all entries - deposits
-    mapping(address => uint256) public TotalsupplyCoinsRewardsandNFM;
-    //DayCount => Totaldeposits
-    mapping(uint256 => uint256) public Totaldeposits;
-     */
-    //Stores all nfm rewards paid
-    uint256 public TotalNFMrewardspaid;
+
+    //Stores all nfm locked
     uint256 public TotalNFMlocked;
     uint256 public generalIndex;
     //Struct for each deposit
@@ -200,6 +180,8 @@ contract NFMStaking {
     mapping(address => uint256[]) public DepositindexStaker;
     //Tracks total deposit of the user address user => totaldepositamount in pool
     mapping(address => uint256) public TotaldepositonStaker;
+    //Tracks total deposit on the day => totaldepositamount in pool
+    mapping(uint256 => uint256) public Totaldepositperday;
     //generalIndex of userDepositInfo => coin address => true if paid wmatic,wbtc,...
     mapping(uint256 => mapping(address => bool)) public ClaimingConfirmation;
 
@@ -280,11 +262,37 @@ contract NFMStaking {
         DepositindexStaker[msg.sender].push(generalIndex);
         // ADD AMOUNT TO STAKERS TOTALDEPOSIT
         TotaldepositonStaker[msg.sender] += Amount;
-
+        TotalNFMlocked += Amount;
+        Totaldepositperday[
+            INfmStakingTreasuryERC20(
+                address(_Controller._getNFMStakingTreasuryERC20())
+            ).returnDayindex()
+        ] += Amount;
+        generalIndex++;
         return true;
     }
 
-    function _min(uint256 x, uint256 y) private pure returns (uint256) {
-        return x <= y ? x : y;
+    function checkDurationEnded(uint256 IndexSt) public view returns (bool) {
+        if (
+            userDepositInfo[msg.sender][IndexSt].inicialtimestamp +
+                (86400 * userDepositInfo[msg.sender][IndexSt].deposittimeDays) <
+            block.timestamp
+        ) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    function returnTotallocked() public view returns (uint256) {
+        return TotalNFMlocked;
+    }
+
+    function returnTotallockedPerDay(uint256 Index)
+        public
+        view
+        returns (uint256)
+    {
+        return Totaldepositperday[Index];
     }
 }
