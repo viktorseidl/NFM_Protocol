@@ -167,15 +167,19 @@ contract NFMStakingTreasuryERC20 {
     uint256 public Timecounter;
     //Array of all currencies allowed
     address[] public Currencies;
+    //Bool if in Update the true else false
+    bool public inUpdate = false;
+    //Bool if in Update the true else false
+    uint256 public currencyUpdateCounter=0;
     // Coinaddress => DayCount => Amounttotalavailable for Reward this day Day
-    mapping(address => mapping(uint256 => uint256)) public DailyTotalAvailable;
+    mapping(address => mapping(uint256 => uint256)) public DailyTotalAvailable; //donnerstag = 1 Mio
     // Coinaddress => DayCount => rewardPerDayPer1NFM
     mapping(address => mapping(uint256 => uint256))
-        public DailyrewardCoinperNFM;
+        public DailyrewardCoinperNFM;                       //Zins pro NFM an diesem Tag
     // Coinaddress => Totalsupply of coins all entries - payouts
-    mapping(address => uint256) public TotalsupplyCoinsRewardsandNFM;
+    mapping(address => uint256) public TotalsupplyCoinsRewardsandNFM;  //gesamtguthaben einer währung im vertrag => auszahlungen werden abgezogen Beispiel 1 mio 100000 Auszahlung ergibt 900000
     // Coinaddress => Totalsupply of coins all entries - payouts
-    mapping(address => uint256) public TotalRewardsPaid;
+    mapping(address => uint256) public TotalRewardsPaid;    //Gesamtauszahlungen pro währung
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /* 
@@ -225,7 +229,24 @@ contract NFMStakingTreasuryERC20 {
         Timecounter = block.timestamp + (3600 * 24);
         Currencies.push(address(Cont._getNFM()));
     }
+    //returns the amount of earned interests
+    function calculateearned(address Curre, uint256 amount, uint256 reward) public view returns (uint256){
+        uint256 cdecimal = IERC20(address(Curre)).decimals();
+        uint256 Camount=amount;
+        uint256 NFMreward=reward;
+        if(cdecimal<18){
+            Camount=Camount*10**(18-cdecimal);
+            NFMreward=NFMreward*10**(18-cdecimal);
+            Camount=SafeMath.div(SafeMath.mul(Camount, NFMreward), 10**18);
+            Camount=SafeMath.div(Camount, 10**(18-cdecimal));
+        }else{
+            Camount=SafeMath.div(SafeMath.mul(Camount, NFMreward), 10**18);
+        }
+        return Camount;
 
+
+
+    }
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @updateBalancesStake() returns (bool);
@@ -246,6 +267,7 @@ contract NFMStakingTreasuryERC20 {
     function returntime() public view returns (uint256, uint256) {
         return (Timecounter, TotalDayCount);
     }
+    
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
@@ -254,115 +276,70 @@ contract NFMStakingTreasuryERC20 {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function updateBalancesStake() public onlyOwner returns (bool) {
-        //Only if Timecounter is smaller than timestamp update possible
-        require(Timecounter < block.timestamp, "NT");
-<<<<<<< HEAD
-        uint256 LastDay = INfmStaking(address(_Controller._getNFMStaking()))
-            .returnTotallockedPerDay(TotalDayCount);
-=======
-        //change to the next day
->>>>>>> ed7127d85167778a0c775fb474a41b31ac09979e
-        TotalDayCount++;
-        //add 24 hours to timecounter timestamp
-        Timecounter = Timecounter + (3600 * 24);
-        //inicialice uint for calculations
-        uint256 balanceContract;
-        uint256 cdecimal;
-        for (uint256 i = 0; i < Currencies.length; i++) {
-            //Get contract Balance
-            balanceContract = IERC20(address(Currencies[i])).balanceOf(
-                address(this)
-            );
-<<<<<<< HEAD
-            cdecimal = IERC20(address(Currencies[i])).decimals();
-            if (
-                balanceContract > TotalsupplyCoinsRewardsandNFM[Currencies[i]]
-            ) {
-=======
-            //Only if Contract Balance greater than totalsupply registered, then there will be a new entry
-            if (
-                balanceContract > TotalsupplyCoinsRewardsandNFM[Currencies[i]]
-            ) {
-                //Set daily Available amount for rewards
-                DailyTotalAvailable[Currencies[i]][Timecounter] = SafeMath.sub(
-                    balanceContract,
-                    TotalsupplyCoinsRewardsandNFM[Currencies[i]]
-                );
-                //Check decimals for calculations
-                cdecimal = IERC20(address(Currencies[i])).decimals();
-                //if coin decimals smaller than 18, change format to 36 digits for calculations
->>>>>>> ed7127d85167778a0c775fb474a41b31ac09979e
-                if (cdecimal < 18) {
-                    DailyTotalAvailable[Currencies[i]][Timecounter] = SafeMath
-                        .sub(
-                            balanceContract,
-                            (TotalsupplyCoinsRewardsandNFM[Currencies[i]] +
-                                SafeMath.div(
-                                    SafeMath.mul(
-                                        (DailyrewardCoinperNFM[Currencies[i]][
-                                            TotalDayCount
-                                        ] *
-                                            10**18 -
-                                            cdecimal),
-                                        LastDay
-                                    ),
-                                    10**18 - cdecimal
-                                ))
-                        );
-                    balanceContract = (DailyTotalAvailable[Currencies[i]][
-                        TotalDayCount
-                    ] *
-                        10**(18 - cdecimal) *
-                        10**18);
-<<<<<<< HEAD
-                } else {
-                    DailyTotalAvailable[Currencies[i]][Timecounter] = SafeMath
-                        .sub(
-                            balanceContract,
-                            (TotalsupplyCoinsRewardsandNFM[Currencies[i]] +
-                                SafeMath.mul(
-                                    DailyrewardCoinperNFM[Currencies[i]][
-                                        TotalDayCount
-                                    ],
-                                    LastDay
-                                ))
-                        );
-                    balanceContract = (DailyTotalAvailable[Currencies[i]][
-                        TotalDayCount
-                    ] * 10**18);
-=======
-                }else{
-                    //change format to 36 digits
-                    balanceContract = (DailyTotalAvailable[Currencies[i]][
-                        Timecounter
-                    ] *
-                        10**18);
->>>>>>> ed7127d85167778a0c775fb474a41b31ac09979e
-                }
-                //Calculate Dailytotalamount for rewards / total supply nfm
-                balanceContract = SafeMath.div(
-                    balanceContract,
-                    IERC20(address(_Controller._getNFM())).totalSupply()
-                );
-                // If coin digits smaller than 18, then return digit format to coin format
-                if (cdecimal < 18) {
-                    balanceContract = SafeMath.div(
-                        balanceContract,
-                        10**(18 - cdecimal)
-                    );
-                }
-
-                DailyrewardCoinperNFM[Currencies[i]][
-                    TotalDayCount
-                ] = balanceContract;
-                TotalsupplyCoinsRewardsandNFM[
-                    Currencies[i]
-                ] += DailyTotalAvailable[Currencies[i]][TotalDayCount];
-            }
+        //Only if Timecounter is smaller than timestamp or in Update equals true update possible
+        require(Timecounter < block.timestamp || inUpdate==true, "NT");
+        if(Timecounter<block.timestamp){
+            //First update
+            TotalDayCount++;
+            //add 24 hours to timecounter timestamp
+            Timecounter = Timecounter + (3600 * 24);
+            inUpdate=true;  
         }
+        uint256 LastDay = INfmStaking(address(_Controller._getNFMStaking()))
+            .returnTotallockedPerDay(TotalDayCount-1);
+            //inicialice uint for calculations
+            uint256 balanceContract;
+            uint256 TotalBalanceMonitored;
+            uint256 cdecimal = IERC20(address(Currencies[currencyUpdateCounter])).decimals();
+            if (
+                balanceContract > TotalsupplyCoinsRewardsandNFM[Currencies[currencyUpdateCounter]]
+            ){
+                //Update necessary
+                if(cdecimal<18){
+                    //Need to be converted to 18 digits
+                    balanceContract = IERC20(address(Currencies[currencyUpdateCounter])).balanceOf(address(this))*10**(18-cdecimal); //Actual Contract Balance
+                    TotalBalanceMonitored=TotalsupplyCoinsRewardsandNFM[Currencies[currencyUpdateCounter]]*10**(18-cdecimal);   //last Balance monitored
+                    uint256 YesterdayEarnings=calculateearned(Currencies[currencyUpdateCounter], LastDay, 
+                    DailyrewardCoinperNFM[Currencies[currencyUpdateCounter]][TotalDayCount-1])*10**(18-cdecimal);                  //Zinsen insgesamt vortag
+                    LastDay=LastDay*10**(18-cdecimal);                                                                          // yesterday deposits
+                    uint256 ReinvestingPart=SafeMath.sub(DailyTotalAvailable[Currencies[currencyUpdateCounter]][TotalDayCount-1]*10**(18-cdecimal), YesterdayEarnings);  //remaining from yesterday
+                    DailyTotalAvailable[Currencies[currencyUpdateCounter]][TotalDayCount]=SafeMath.div(SafeMath.add(SafeMath.sub(balanceContract, TotalBalanceMonitored),ReinvestingPart),10**(18-cdecimal)); //New dailyTotalAvailable COINFORMAT
+                    DailyrewardCoinperNFM[Currencies[currencyUpdateCounter]][TotalDayCount]=SafeMath.div(SafeMath.div(SafeMath.mul(SafeMath.mul(DailyTotalAvailable[Currencies[currencyUpdateCounter]][TotalDayCount], 10**(18-cdecimal)),10**18), IERC20(address(_Controller._getNFM())).totalSupply()),10**(18-cdecimal)); //Reward per NFMCOINFORMAT
+                    TotalsupplyCoinsRewardsandNFM[Currencies[currencyUpdateCounter]]=SafeMath.div(balanceContract,10**(18-cdecimal));  //Monitor actual Balance for next update schedule
+                    
+                }else{
+                    //no convertion nessesary
+                    balanceContract = IERC20(address(Currencies[currencyUpdateCounter])).balanceOf(address(this)); //Actual Contract Balance
+                    TotalBalanceMonitored=TotalsupplyCoinsRewardsandNFM[Currencies[currencyUpdateCounter]];   //last Balance monitored
+                    uint256 YesterdayEarnings=calculateearned(Currencies[currencyUpdateCounter], LastDay, 
+                    DailyrewardCoinperNFM[Currencies[currencyUpdateCounter]][TotalDayCount-1]);                  //Zinsen insgesamt vortag
+                    LastDay=LastDay;                                                                          // yesterday deposits
+                    uint256 ReinvestingPart=SafeMath.sub(DailyTotalAvailable[Currencies[currencyUpdateCounter]][TotalDayCount-1], YesterdayEarnings);  //remaining from yesterday
+                    DailyTotalAvailable[Currencies[currencyUpdateCounter]][TotalDayCount]=SafeMath.add(SafeMath.sub(balanceContract, TotalBalanceMonitored),ReinvestingPart); //New dailyTotalAvailable NFMFORMAT
+                    DailyrewardCoinperNFM[Currencies[currencyUpdateCounter]][TotalDayCount]=SafeMath.div(SafeMath.mul(DailyTotalAvailable[Currencies[currencyUpdateCounter]][TotalDayCount],10**18), IERC20(address(_Controller._getNFM())).totalSupply()); //Reward per NFMFORMAT
+                    TotalsupplyCoinsRewardsandNFM[Currencies[currencyUpdateCounter]]=balanceContract;  //Monitor actual Balance for next update schedule
+                }
+                
+                if(currencyUpdateCounter+1==Currencies.length){
+                    currencyUpdateCounter=0;
+                    inUpdate=false;
+                }else{
+                    currencyUpdateCounter++;
+                }
+            }else{
+                //No update needed
+                if(currencyUpdateCounter+1==Currencies.length){
+                    currencyUpdateCounter=0;
+                    inUpdate=false;
+                }else{
+                    currencyUpdateCounter++;
+                }
+                
+            }     
+        
         return true;
     }
-    function 
+     
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @returnSecAmount(address Coin) returns (uint256);
