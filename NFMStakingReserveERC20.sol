@@ -136,32 +136,60 @@ interface IERC20 {
         uint256 amount
     ) external returns (bool);
 }
-
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+/// @title NFMStaking.sol
+/// @author Fernando Viktor Seidl E-mail: viktorseidl@gmail.com
+/// @notice This contract holds the entire ERC-20 Reserves of the NFM Staking Pool. This contract regulates the 
+///         interest to be generated from the investments in the NFM Staking Contract
+/// @dev This contract holds the entire ERC-20 Reserves of the NFM Staking Pool. This contract regulates the 
+///      interest to be generated from the investments in the NFM Staking Contract
+///
+///
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 contract NFMStakeReserveERC20 {
+    //include SafeMath
     using SafeMath for uint256;
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    CONTROLLER
+    OWNER = MSG.SENDER ownership will be handed over to dao
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     INfmController private _Controller;
     address private _Owner;
     address private _SController;
-
-    //CONTRACT VARIABLE
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    DayCounter          =>  total investments
+    Time24Hours         =>  24 Hours imestamp value
+    NextUpdateTime      =>  Next timestamp to update balances
+    Currencies          =>  Array of all allowed Currencies
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 public DayCounter = 0;
     uint256 public Time24Hours = 300;
     uint256 public NextUpdateTime;
-
-    bool public inUpdate = false;
     address[] public Currencies;
-    uint256 public CurrenciesUpdateCounter = 0;
-    //Coin => DayCounter => Total Amount per Day for rewards.
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    MAPPINGS
+    TotalAmountPerDayForRewards(address => (uint256 => uint256)          =>  //Coin => DayCounter => Total Amount per Day for rewards.
+    DailyRewardPer1NFM(address => (uint256 => uint256)                   =>  //Coin => DayCounter => Amount per Day for 1 NFM.
+    TotalRewardSupply(address => uint256)                                =>  //Coin => TotalAmount of Rewards all Time - Payouts
+    TotalRewardsPaid(address => uint256)                                 =>  //Coin => Total of Rewards paid
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     mapping(address => mapping(uint256 => uint256))
-        public TotalAmountPerDayForRewards; //Gesamt Verteilungsbetrag für diesen Tag
-    //Coin => DayCounter => Amount per Day for 1 NFM.
-    mapping(address => mapping(uint256 => uint256)) public DailyRewardPer1NFM; //Verteilungsbetrag für 1 NFM an diesen Tag
-    //Coin => TotalAmount of Rewards all Time - Payouts
+        public TotalAmountPerDayForRewards; 
+    mapping(address => mapping(uint256 => uint256)) public DailyRewardPer1NFM; 
     mapping(address => uint256) public TotalRewardSupply;
-    //Coin => Total of Rewards paid
     mapping(address => uint256) public TotalRewardsPaid;
-    //Modifier
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /* 
+    MODIFIER
+    onlyOwner       => Only Controller listed Contracts and Owner can interact with this contract.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     modifier onlyOwner() {
         require(
             _Controller._checkWLSC(_SController, msg.sender) == true ||
@@ -180,12 +208,22 @@ contract NFMStakeReserveERC20 {
         NextUpdateTime = block.timestamp + 300;
         Currencies.push(Cont._getNFM());
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_addCurrencies(address) returns (bool);
+        This function adds new currencies to the array
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _addCurrencies(address Coin) public onlyOwner returns (bool) {
         Currencies.push(Coin);
         return true;
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnBalanceContract(address) returns (uint256);
+        This function returns the contract balance
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returnBalanceContract(address Currency)
         public
         view
@@ -193,15 +231,30 @@ contract NFMStakeReserveERC20 {
     {
         return IERC20(address(Currency)).balanceOf(address(this));
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnDayCounter() returns (uint256);
+        This function returns the actual Day
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returnDayCounter() public view returns (uint256) {
         return DayCounter;
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnNextUpdateTime() returns (uint256);
+        This function returns the next update timestamp
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returnNextUpdateTime() public view returns (uint256) {
         return NextUpdateTime;
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnCurrencies() returns (address[]);
+        This function returns an Array of all allowed currencies
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returnCurrencies()
         public
         view
@@ -209,11 +262,21 @@ contract NFMStakeReserveERC20 {
     {
         return Currencies;
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnCurrenciesArrayLength() returns (uint256);
+        This function returns the length of the Array of all allowed currencies
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returnCurrenciesArrayLength() public view returns (uint256) {
         return Currencies.length;
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnTotalAmountPerDayForRewards(address, uint256) returns (uint256);
+        This function returns the daily total amount of reward
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returnTotalAmountPerDayForRewards(address Coin, uint256 Day)
         public
         view
@@ -221,7 +284,12 @@ contract NFMStakeReserveERC20 {
     {
         return TotalAmountPerDayForRewards[Coin][Day];
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnDailyRewardPer1NFM(address, uint256) returns (uint256);
+        This function returns the daily amount of reward for 1 NFM
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returnDailyRewardPer1NFM(address Coin, uint256 Day)
         public
         view
@@ -229,7 +297,12 @@ contract NFMStakeReserveERC20 {
     {
         return DailyRewardPer1NFM[Coin][Day];
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnTotalRewardSupply(address) returns (uint256);
+        This function returns the total monitored Reward balance
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returnTotalRewardSupply(address Coin)
         public
         view
@@ -237,7 +310,12 @@ contract NFMStakeReserveERC20 {
     {
         return TotalRewardSupply[Coin];
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnTotalRewardsPaid(address) returns (uint256);
+        This function returns the total Rewards paid
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returnTotalRewardsPaid(address Coin)
         public
         view
@@ -245,7 +323,12 @@ contract NFMStakeReserveERC20 {
     {
         return TotalRewardsPaid[Coin];
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_remainingFromDayAgoRewards(address, uint256) returns (uint256);
+        This function returns the total remaining rewards from a day ago
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _remainingFromDayAgoRewards(address Currency, uint256 Day)
         public
         view
@@ -284,7 +367,12 @@ contract NFMStakeReserveERC20 {
                 );
         }
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_calculateRewardPerNFM(address, uint256) returns (uint256);
+        This function calculates the rewards per 1 NFM
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _calculateRewardPerNFM(address Currency, uint256 Day)
         public
         view
@@ -313,13 +401,17 @@ contract NFMStakeReserveERC20 {
                 );
         }
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_updateStake() returns (bool);
+        This function updates all important balances for the necessary calculations
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _updateStake() public onlyOwner returns (bool) {
-        require(NextUpdateTime < block.timestamp || inUpdate == true, "NT");
+        require(NextUpdateTime < block.timestamp, "NT");
         if (NextUpdateTime < block.timestamp) {
             DayCounter++;
             NextUpdateTime = NextUpdateTime + Time24Hours;
-            inUpdate = true;
         }
         for (uint256 i = 0; i < Currencies.length; i++) {
             TotalAmountPerDayForRewards[Currencies[i]][DayCounter] =
@@ -335,7 +427,12 @@ contract NFMStakeReserveERC20 {
         }
         return true;
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_realizePayments(address, uint256, address) returns (bool);
+        This function executes the payouts
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _realizePayments(
         address Coin,
         uint256 Amount,

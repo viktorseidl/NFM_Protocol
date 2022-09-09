@@ -166,8 +166,8 @@ interface IERC20 {
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /// @title NFMStaking.sol
 /// @author Fernando Viktor Seidl E-mail: viktorseidl@gmail.com
-/// @notice This contract holds the entire ERC-20 Reserves of the NFM Staking Pool.
-/// @dev This extension regulates project Investments.
+/// @notice This contract holds all deposits of the investors and manages them as well as the interest calculations to be generated from them
+/// @dev This contract holds all deposits of the investors and manages them as well as the interest calculations to be generated from them
 ///
 ///
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -183,11 +183,18 @@ contract NFMStaking {
     INfmController private _Controller;
     address private _Owner;
     address private _SController;
-
-    //Stores all nfm locked
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    TotalDepositsOnStake        =>  total investments
+    generalIndex                =>  Unique Index
+    CurrenciesReserveArray      =>  Array includes all allowed currencies
+    Staker                      =>  Tuple containing all information about a user and his investment
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 public TotalDepositsOnStake;
     uint256 public generalIndex;
     address[] public CurrenciesReserveArray;
+    uint256 private _locked = 0;
     //Struct for each deposit
     struct Staker {
         uint256 index;
@@ -198,18 +205,21 @@ contract NFMStaking {
         address ofStaker;
         bool claimed;
     }
-
-    //GIndex => Staker
-    mapping(uint256 => Staker) public StakerInfo;
-    //Address Staker => Array GIndexes by Staker
-    mapping(address => uint256[]) public DepositsOfStaker;
-    //Day => TotalDeposits
-    mapping(uint256 => uint256) public TotalStakedPerDay;
-    //GIndex => Coin address => 1 if paid
-    mapping(uint256 => mapping(address => uint256)) public ClaimingConfirmation;
-    //Gindex => Array of Claimed Rewards
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    MAPPINGS
+    StakerInfo(UniqueIndex => Tuple Staker)        =>  //GIndex => Staker
+    DepositsOfStaker(Staker address => UniqueIndexes)        =>  //Address Staker => Array GIndexes by Staker
+    TotalStakedPerDay(DayIndex => Totaldeposits)        =>  //Day => TotalDeposits
+    ClaimingConfirmation(UniqueIndex => (Staker address => 0=false 1=true))        =>  //GIndex => Coin address => 1 if paid
+    RewardsToWithdraw(UniqueIndex => Array Amounts)        =>  //Gindex => Array of Claimed Rewards
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    mapping(uint256 => Staker) public StakerInfo;    
+    mapping(address => uint256[]) public DepositsOfStaker;    
+    mapping(uint256 => uint256) public TotalStakedPerDay;    
+    mapping(uint256 => mapping(address => uint256)) public ClaimingConfirmation;    
     mapping(uint256 => uint256[]) public RewardsToWithdraw;
-
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /* 
     MODIFIER
@@ -225,6 +235,18 @@ contract NFMStaking {
         require(msg.sender != address(0), "0A");
         _;
     }
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    MODIFIER
+    reentrancyGuard       => secures the protocol against reentrancy attacks
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    modifier reentrancyGuard() {
+        require(_locked == 0);
+        _locked = 1;
+        _;
+        _locked = 0;
+    }
 
     constructor(address Controller) {
         _Owner = msg.sender;
@@ -233,8 +255,13 @@ contract NFMStaking {
         _SController = Controller;
         generalIndex = 0;
     }
-
-    function _updateCurrenciesList() internal returns (bool) {
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_updateCurrenciesList() returns (bool);
+        This function checks the currencies in the NFMStakingReserveERC20. If the array in the NFMStakingReserveERC20 is longer, then update array
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _updateCurrenciesList() internal onlyOwner returns (bool) {
         if (
             CurrenciesReserveArray.length <
             INfmStakingReserveERC20(
@@ -247,15 +274,30 @@ contract NFMStaking {
         }
         return true;
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnTotalDepositsOnStake() returns (uint256);
+        This function returns the total amount of all deposits
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returnTotalDepositsOnStake() public view returns (uint256) {
         return TotalDepositsOnStake;
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returngeneralIndex() returns (uint256);
+        This function returns the unique Index
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returngeneralIndex() public view returns (uint256) {
         return generalIndex;
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnStakerInfo(uint256) returns (struct Staker);
+        This function returns the complete information of a specific deposit
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returnStakerInfo(uint256 Gindex)
         public
         view
@@ -263,15 +305,30 @@ contract NFMStaking {
     {
         return StakerInfo[Gindex];
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnDepositsOfDay(uint256) returns (uint256);
+        This function returns all deposits of a specific day
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returnDepositsOfDay(uint256 Day) public view returns (uint256) {
         return TotalStakedPerDay[Day];
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnDepositsOfStaker() returns (uint256[]);
+        This function returns all deposits from a specific investor
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returnDepositsOfStaker() public view returns (uint256[] memory) {
         return DepositsOfStaker[msg.sender];
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnClaimingConfirmation(address, uint256) returns (uint256);
+        This function returns a numeric boolean whether the withdrawal has occurred
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _returnClaimingConfirmation(address Coin, uint256 Gindex)
         public
         view
@@ -279,18 +336,28 @@ contract NFMStaking {
     {
         return ClaimingConfirmation[Gindex][Coin];
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_setDepositOnDailyMap(uint256,uint256,uint256) returns (bool);
+        This function saves the deposit in the appropriate times for calculation.
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _setDepositOnDailyMap(
         uint256 Amount,
         uint256 Startday,
         uint256 Period
-    ) internal returns (bool) {
+    ) internal onlyOwner returns (bool) {
         for (uint256 i = Startday; i < (Startday + Period); i++) {
             TotalStakedPerDay[i] += Amount;
         }
         return true;
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_calculateRewardPerDeposit(address, uint256, uint256) returns (uint256);
+        This function calculates interest on a specific day for a specific deposit.
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _calculateRewardPerDeposit(
         address Coin,
         uint256 RewardAmount,
@@ -314,7 +381,12 @@ contract NFMStaking {
                 SafeMath.div(SafeMath.mul(RewardAmount, DepositAmount), 10**18);
         }
     }
-
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_calculateEarnings(address, uint256, uint256, uint256) returns (uint256);
+        This function calculates the total interest on a specific day for a specific period on a deposit.
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _calculateEarnings(
         address Coin,
         uint256 StakedAmount,
@@ -333,8 +405,13 @@ contract NFMStaking {
         }
         return Earned;
     }
-
-    function deposit(uint256 Amount, uint256 Period) public returns (bool) {
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_deposit(uint256, uint256) returns (bool);
+        This function invests an amount X of NFM in this contract. The NFM must be released beforehand to the contract by means of approval
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _deposit(uint256 Amount, uint256 Period) public returns (bool) {
         if (
             INfmStakingReserveERC20(
                 address(_Controller._getNFMStakingTreasuryERC20())
@@ -382,8 +459,26 @@ contract NFMStaking {
         generalIndex++;
         return true;
     }
-
-    function _claimRewards(uint256 Index) public returns (bool) {
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_claimRewards(uint256) returns (bool);
+        This function is responsible for claiming the interest
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _claimRewards(uint256 Index) public reentrancyGuard returns (bool) {
+        if (
+            INfmStakingReserveERC20(
+                address(_Controller._getNFMStakingTreasuryERC20())
+            )._returnNextUpdateTime() < block.timestamp
+        ) {
+            require(
+                INfmStakingReserveERC20(
+                    address(_Controller._getNFMStakingTreasuryERC20())
+                )._updateStake() == true,
+                "NU"
+            );
+        }
+        _updateCurrenciesList();
         require(StakerInfo[Index].ofStaker == msg.sender, "oO");
         require(
             StakerInfo[Index].inicialtimestamp +
@@ -405,8 +500,13 @@ contract NFMStaking {
         StakerInfo[Index].claimed = true;
         return true;
     }
-
-    function _withdrawDepositAndRewards(uint256 Index) public returns (bool) {
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_withdrawDepositAndRewards(uint256) returns (bool);
+        This function is responsible for the payment and withdrawal of interest and deposit
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _withdrawDepositAndRewards(uint256 Index) public reentrancyGuard returns (bool) {
         require(ClaimingConfirmation[Index][_Controller._getNFM()] == 0, "AW");
         require(
             StakerInfo[Index].inicialtimestamp +
