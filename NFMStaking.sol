@@ -215,10 +215,10 @@ contract NFMStaking {
     RewardsToWithdraw(UniqueIndex => Array Amounts)        =>  //Gindex => Array of Claimed Rewards
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    mapping(uint256 => Staker) public StakerInfo;    
-    mapping(address => uint256[]) public DepositsOfStaker;    
-    mapping(uint256 => uint256) public TotalStakedPerDay;    
-    mapping(uint256 => mapping(address => uint256)) public ClaimingConfirmation;    
+    mapping(uint256 => Staker) public StakerInfo;
+    mapping(address => uint256[]) public DepositsOfStaker;
+    mapping(uint256 => uint256) public TotalStakedPerDay;
+    mapping(uint256 => mapping(address => uint256)) public ClaimingConfirmation;
     mapping(uint256 => uint256[]) public RewardsToWithdraw;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /* 
@@ -255,6 +255,7 @@ contract NFMStaking {
         _SController = Controller;
         generalIndex = 0;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_updateCurrenciesList() returns (bool);
@@ -274,6 +275,7 @@ contract NFMStaking {
         }
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returnTotalDepositsOnStake() returns (uint256);
@@ -283,6 +285,7 @@ contract NFMStaking {
     function _returnTotalDepositsOnStake() public view returns (uint256) {
         return TotalDepositsOnStake;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returngeneralIndex() returns (uint256);
@@ -292,6 +295,7 @@ contract NFMStaking {
     function _returngeneralIndex() public view returns (uint256) {
         return generalIndex;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returnStakerInfo(uint256) returns (struct Staker);
@@ -305,6 +309,7 @@ contract NFMStaking {
     {
         return StakerInfo[Gindex];
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returnDepositsOfDay(uint256) returns (uint256);
@@ -314,6 +319,7 @@ contract NFMStaking {
     function _returnDepositsOfDay(uint256 Day) public view returns (uint256) {
         return TotalStakedPerDay[Day];
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returnDepositsOfStaker() returns (uint256[]);
@@ -323,6 +329,7 @@ contract NFMStaking {
     function _returnDepositsOfStaker() public view returns (uint256[] memory) {
         return DepositsOfStaker[msg.sender];
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returnClaimingConfirmation(address, uint256) returns (uint256);
@@ -336,6 +343,7 @@ contract NFMStaking {
     {
         return ClaimingConfirmation[Gindex][Coin];
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_setDepositOnDailyMap(uint256,uint256,uint256) returns (bool);
@@ -352,6 +360,7 @@ contract NFMStaking {
         }
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_calculateRewardPerDeposit(address, uint256, uint256) returns (uint256);
@@ -381,6 +390,7 @@ contract NFMStaking {
                 SafeMath.div(SafeMath.mul(RewardAmount, DepositAmount), 10**18);
         }
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_calculateEarnings(address, uint256, uint256, uint256) returns (uint256);
@@ -405,6 +415,7 @@ contract NFMStaking {
         }
         return Earned;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_deposit(uint256, uint256) returns (bool);
@@ -425,6 +436,14 @@ contract NFMStaking {
             );
         }
         _updateCurrenciesList();
+        require(
+            Period == 7 ||
+                Period == 15 ||
+                Period == 30 ||
+                Period == 45 ||
+                Period == 60,
+            "NIP"
+        );
         require(
             IERC20(address(_Controller._getNFM())).transferFrom(
                 msg.sender,
@@ -459,13 +478,18 @@ contract NFMStaking {
         generalIndex++;
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_claimRewards(uint256) returns (bool);
         This function is responsible for claiming the interest
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _claimRewards(uint256 Index) public reentrancyGuard returns (bool) {
+    function _claimRewards(uint256 Index)
+        public
+        reentrancyGuard
+        returns (bool)
+    {
         if (
             INfmStakingReserveERC20(
                 address(_Controller._getNFMStakingTreasuryERC20())
@@ -482,7 +506,7 @@ contract NFMStaking {
         require(StakerInfo[Index].ofStaker == msg.sender, "oO");
         require(
             StakerInfo[Index].inicialtimestamp +
-                (300 * StakerInfo[Index].deposittimeDays) <
+                (86400 * StakerInfo[Index].deposittimeDays) <
                 block.timestamp,
             "CNT"
         );
@@ -500,17 +524,22 @@ contract NFMStaking {
         StakerInfo[Index].claimed = true;
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_withdrawDepositAndRewards(uint256) returns (bool);
         This function is responsible for the payment and withdrawal of interest and deposit
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _withdrawDepositAndRewards(uint256 Index) public reentrancyGuard returns (bool) {
+    function _withdrawDepositAndRewards(uint256 Index)
+        public
+        reentrancyGuard
+        returns (bool)
+    {
         require(ClaimingConfirmation[Index][_Controller._getNFM()] == 0, "AW");
         require(
             StakerInfo[Index].inicialtimestamp +
-                (300 * StakerInfo[Index].deposittimeDays) <
+                (86400 * StakerInfo[Index].deposittimeDays) <
                 block.timestamp,
             "CNT"
         );
@@ -538,5 +567,37 @@ contract NFMStaking {
         );
         TotalDepositsOnStake -= StakerInfo[Index].amountNFMStaked;
         return true;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_getWithdraw(address Coin,address To,uint256 amount,bool percent) returns (bool);
+    This function is used by Vault Contracts for generating addictional income on Investments.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _getWithdraw(
+        address Coin,
+        address To,
+        uint256 amount,
+        bool percent
+    ) public onlyOwner returns (bool) {
+        require(To != address(0), "0A");
+        uint256 CoinAmount = IERC20(address(Coin)).balanceOf(address(this));
+        if (percent == true) {
+            //makeCalcs on Percentatge
+            uint256 AmountToSend = SafeMath.div(
+                SafeMath.mul(CoinAmount, amount),
+                100
+            );
+            IERC20(address(Coin)).transfer(To, AmountToSend);
+            return true;
+        } else {
+            if (amount == 0) {
+                IERC20(address(Coin)).transfer(To, CoinAmount);
+            } else {
+                IERC20(address(Coin)).transfer(To, amount);
+            }
+            return true;
+        }
     }
 }

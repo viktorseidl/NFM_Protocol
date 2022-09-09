@@ -136,12 +136,13 @@ interface IERC20 {
         uint256 amount
     ) external returns (bool);
 }
+
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /// @title NFMStaking.sol
 /// @author Fernando Viktor Seidl E-mail: viktorseidl@gmail.com
-/// @notice This contract holds the entire ERC-20 Reserves of the NFM Staking Pool. This contract regulates the 
+/// @notice This contract holds the entire ERC-20 Reserves of the NFM Staking Pool. This contract regulates the
 ///         interest to be generated from the investments in the NFM Staking Contract
-/// @dev This contract holds the entire ERC-20 Reserves of the NFM Staking Pool. This contract regulates the 
+/// @dev This contract holds the entire ERC-20 Reserves of the NFM Staking Pool. This contract regulates the
 ///      interest to be generated from the investments in the NFM Staking Contract
 ///
 ///
@@ -167,7 +168,7 @@ contract NFMStakeReserveERC20 {
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     uint256 public DayCounter = 0;
-    uint256 public Time24Hours = 300;
+    uint256 public Time24Hours = 86400;
     uint256 public NextUpdateTime;
     address[] public Currencies;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -180,8 +181,8 @@ contract NFMStakeReserveERC20 {
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     mapping(address => mapping(uint256 => uint256))
-        public TotalAmountPerDayForRewards; 
-    mapping(address => mapping(uint256 => uint256)) public DailyRewardPer1NFM; 
+        public TotalAmountPerDayForRewards;
+    mapping(address => mapping(uint256 => uint256)) public DailyRewardPer1NFM;
     mapping(address => uint256) public TotalRewardSupply;
     mapping(address => uint256) public TotalRewardsPaid;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -205,9 +206,10 @@ contract NFMStakeReserveERC20 {
         INfmController Cont = INfmController(Controller);
         _Controller = Cont;
         _SController = Controller;
-        NextUpdateTime = block.timestamp + 300;
+        NextUpdateTime = block.timestamp + 86400;
         Currencies.push(Cont._getNFM());
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_addCurrencies(address) returns (bool);
@@ -218,6 +220,7 @@ contract NFMStakeReserveERC20 {
         Currencies.push(Coin);
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returnBalanceContract(address) returns (uint256);
@@ -231,6 +234,7 @@ contract NFMStakeReserveERC20 {
     {
         return IERC20(address(Currency)).balanceOf(address(this));
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returnDayCounter() returns (uint256);
@@ -240,6 +244,7 @@ contract NFMStakeReserveERC20 {
     function _returnDayCounter() public view returns (uint256) {
         return DayCounter;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returnNextUpdateTime() returns (uint256);
@@ -249,6 +254,7 @@ contract NFMStakeReserveERC20 {
     function _returnNextUpdateTime() public view returns (uint256) {
         return NextUpdateTime;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returnCurrencies() returns (address[]);
@@ -262,6 +268,7 @@ contract NFMStakeReserveERC20 {
     {
         return Currencies;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returnCurrenciesArrayLength() returns (uint256);
@@ -271,6 +278,7 @@ contract NFMStakeReserveERC20 {
     function _returnCurrenciesArrayLength() public view returns (uint256) {
         return Currencies.length;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returnTotalAmountPerDayForRewards(address, uint256) returns (uint256);
@@ -284,6 +292,7 @@ contract NFMStakeReserveERC20 {
     {
         return TotalAmountPerDayForRewards[Coin][Day];
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returnDailyRewardPer1NFM(address, uint256) returns (uint256);
@@ -297,6 +306,21 @@ contract NFMStakeReserveERC20 {
     {
         return DailyRewardPer1NFM[Coin][Day];
     }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnDailyRewardPer1NFM(address, uint256) returns (uint256);
+        This function returns the daily amount of reward for 1 NFM
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returnSecondRewardPer1NFM(address Coin, uint256 Day)
+        public
+        view
+        returns (uint256)
+    {
+        return SafeMath.div(DailyRewardPer1NFM[Coin][Day], 86400);
+    }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returnTotalRewardSupply(address) returns (uint256);
@@ -310,6 +334,7 @@ contract NFMStakeReserveERC20 {
     {
         return TotalRewardSupply[Coin];
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_returnTotalRewardsPaid(address) returns (uint256);
@@ -323,6 +348,7 @@ contract NFMStakeReserveERC20 {
     {
         return TotalRewardsPaid[Coin];
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_remainingFromDayAgoRewards(address, uint256) returns (uint256);
@@ -367,6 +393,7 @@ contract NFMStakeReserveERC20 {
                 );
         }
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_calculateRewardPerNFM(address, uint256) returns (uint256);
@@ -401,6 +428,7 @@ contract NFMStakeReserveERC20 {
                 );
         }
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_updateStake() returns (bool);
@@ -427,6 +455,7 @@ contract NFMStakeReserveERC20 {
         }
         return true;
     }
+
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
         @_realizePayments(address, uint256, address) returns (bool);
@@ -447,5 +476,40 @@ contract NFMStakeReserveERC20 {
             }
         }
         return true;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_getWithdraw(address Coin,address To,uint256 amount,bool percent) returns (bool);
+    This function is used by Vault Contracts.
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _getWithdraw(
+        address Coin,
+        address To,
+        uint256 amount,
+        bool percent
+    ) public onlyOwner returns (bool) {
+        require(To != address(0), "0A");
+        uint256 CoinAmount = IERC20(address(Coin)).balanceOf(address(this));
+        if (percent == true) {
+            //makeCalcs on Percentatge
+            uint256 AmountToSend = SafeMath.div(
+                SafeMath.mul(CoinAmount, amount),
+                100
+            );
+            TotalRewardSupply[Coin] -= AmountToSend;
+            IERC20(address(Coin)).transfer(To, AmountToSend);
+            return true;
+        } else {
+            if (amount == 0) {
+                TotalRewardSupply[Coin] -= CoinAmount;
+                IERC20(address(Coin)).transfer(To, CoinAmount);
+            } else {
+                TotalRewardSupply[Coin] -= amount;
+                IERC20(address(Coin)).transfer(To, amount);
+            }
+            return true;
+        }
     }
 }
