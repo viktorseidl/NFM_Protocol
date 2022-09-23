@@ -20,41 +20,41 @@ contract AFTController {
     address private _AFTController;
     address private _Owner;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    //Integrated Logic of NFM
+    //Integrated Logic of AFT
     /*
-    Important NFM Addresses to be whitelisted on Controller
-    NFM Adresses
+    Important AFT Addresses to be whitelisted on Controller
+    AFT Adresses
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    address private _AFT;                                     //ERC20 Contract          XX
-    address private _DaoGovernance;                                    //Timer Contract     XX
-    address private _Contributor;                                       //Pump and Dump Contract    XX
-    address private _DaoReserveERC20;                                  //Minting Contract       XX
-    address private _DaoReserveETH;                                 //Burning Contract      XX
-    address private _DaoPulling;                             //NFM DEX Contract     XX
-    address private _DaoContributorPulling;                               //NFM Treasury Contract       XX
-    address private _DaoNFMPulling;                       //NFM Pulling Contract        XX
-    address private _DaoTotalPulling;                       //Final Pulling Contract        XX
-    address private _DaoExchange;                              //Principals Distribution Contract       XX
-    address private _DaoFinance;                                  //Airdrop Contract        XX
-    address private _DaoUpdates;                                  //Airdrop Contract        XX
-    address private _DaoMultiSig;                                  //Airdrop Contract       XX
-    address private _DaoYield;                                  //Airdrop Contract      XX
-    address private _DaoVault1;                                  //Airdrop Contract     XX
-    address private _DaoVault2;                                  //Airdrop Contract
-    address private _DaoVault3;                                  //Airdrop Contract
-    address private _DaoVault4;                                  //Airdrop Contract
-    address private _DaoVault5;                                  //Airdrop Contract
-    address private _DaoVault6;                                  //Airdrop Contract
-    address private _DaoVault7;                                  //Airdrop Contract
-    address private _DaoVault8;                                  //Airdrop Contract
-    address private _DaoVault9;                                  //Airdrop Contract
-    address private _DaoVault10;                                  //Airdrop Contract
-    address private _DaoVault11;                                  //Airdrop Contract
-    address private _DaoVault12;                                  //Airdrop Contract
-    address private _DaoVault13;                                  //Airdrop Contract
-    address private _DaoVault14;                                  //Airdrop Contract
-    address private _DaoVault15;                                  //Airdrop Contract
+    address private _AFT;                                       //ERC20 Contract          
+    address private _DaoGovernance;                             //Governance Logic     
+    address private _Contributor;                               //NFM Contributor    
+    address private _DaoReserveERC20;                           //Dao ERC20 Reserve       
+    address private _DaoReserveETH;                             //Dao MATIC Reserve     
+    address private _DaoPulling;                                //AFT Pulling Contract    
+    address private _DaoContributorPulling;                     //Contributor Contract       
+    address private _DaoNFMPulling;                             //NFM Pulling Contract        
+    address private _DaoTotalPulling;                           //Final Pulling Contract        
+    address private _DaoExchange;                               //Dao TokenExchange Contract       
+    address private _DaoFinance;                                //Dao Finance Contract        
+    address private _DaoUpdates;                                //Dao Update-Handler Contract        
+    address private _DaoMultiSig;                               //Dao MultiSig Contract       
+    address private _DaoYield;                                  //Dao Yield Contract      
+    address private _DaoVault1;                                 //Dao Vault Contract     
+    address private _DaoVault2;                                 //Dao Vault Contract
+    address private _DaoVault3;                                 //Dao Vault Contract
+    address private _DaoVault4;                                 //Dao Vault Contract
+    address private _DaoVault5;                                 //Dao Vault Contract
+    address private _DaoVault6;                                 //Dao Vault Contract
+    address private _DaoVault7;                                 //Dao Vault Contract
+    address private _DaoVault8;                                 //Dao Vault Contract
+    address private _DaoVault10;                                //Dao Vault Contract
+    address private _DaoVault11;                                //Dao Vault Contract
+    address private _DaoVault9;                                 //Dao Vault Contract
+    address private _DaoVault12;                                //Dao Vault Contract
+    address private _DaoVault13;                                //Dao Vault Contract
+    address private _DaoVault14;                                //Dao Vault Contract
+    address private _DaoVault15;                                //Dao Vault Contract
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     MAPPINGS
