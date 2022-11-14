@@ -1,6 +1,6 @@
 # DEX Listings of the NFM Token
 
-<h2>Quickswap</h2></br>
+</br></br><h2>Quickswap</h2>
 <h3>Router Address:</h3>0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff</br>
 <a href="https://quickswap.exchange/#/analytics/v2/token/0x5dd05762b831a977b974db8759772d41f3d5ff0b">https://quickswap.exchange/#/analytics/v2/token/0x5dd05762b831a977b974db8759772d41f3d5ff0b</a>
 </br>
@@ -33,7 +33,7 @@
 <li>BAT / NFM: 0xda66D9a48325Db42F02604a5790ec72b147be0b6</li>
 </ul>
 
-</br></br><h2>SushiSwap</h2></br>
+</br></br><h2>SushiSwap</h2>
 <h3>Router Address:</h3>0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506</br>
 
 <h3>Pair Addresses:</h3>
@@ -44,7 +44,7 @@
 <li>NFM / AXS: 0x9B5AcAC264Fec5CC5740FF0AecCe561EC0194bF2</li>
 </ul>
 
-</br></br><h2>UniSwapV3</h2></br>
+</br></br><h2>UniSwapV3</h2>
 <h3>Router Address:</h3>0xE592427A0AEce92De3Edee1F18E0157C05861564</br>
 <a href="https://info.uniswap.org/#/polygon/tokens/0x5dd05762b831a977b974db8759772d41f3d5ff0b">https://info.uniswap.org/#/polygon/tokens/0x5dd05762b831a977b974db8759772d41f3d5ff0b</a>
 </br>
@@ -59,7 +59,7 @@
 <li>NFM / WETH: 0x8D8f93572de3CC737678eB315c93d53958dE37C9</li>
 </ul>
 
-</br></br><h2>KyberSwap</h2></br>
+</br></br><h2>KyberSwap</h2>
 <h3>Router Address:</h3>0x2B1c7b41f6A8F2b2bc45C3233a5d5FB3cD6dC9A8</br>
 <a href="https://analytics.kyberswap.com/elastic/polygon/token/0x5dd05762b831a977b974db8759772d41f3d5ff0b">https://analytics.kyberswap.com/elastic/polygon/token/0x5dd05762b831a977b974db8759772d41f3d5ff0b</a>
 </br>
@@ -70,7 +70,7 @@
 <li>NFM / USDT: 0xCC8a5B9208878fa7880c207AD90DBc914DeFbbca</li>
 </ul>
 
-</br></br><h2>ApeSwap</h2></br>
+</br></br><h2>ApeSwap</h2>
 <h3>Router Address:</h3>0xC0788A3aD43d79aa53B09c2EaCc313A787d1d607</br>
 <a href="https://polygon.info.apeswap.finance/token/0x5dd05762b831a977b974db8759772d41f3d5ff0b">https://polygon.info.apeswap.finance/token/0x5dd05762b831a977b974db8759772d41f3d5ff0b</a>
 </br>
@@ -79,7 +79,7 @@
 <li>MATIC / NFM: 0x96b7c28e8a1252a11d5347dcc5302563ff70c9ee</li>
 </ul>
 
-</br></br><h2>JetSwap</h2></br>
+</br></br><h2>JetSwap</h2>
 <h3>Router Address:</h3>0x5C6EC38fb0e2609672BDf628B1fD605A523E5923</br>
 <a href="https://polygon-info.jetswap.finance/token/0x5dd05762b831a977b974db8759772d41f3d5ff0b">https://polygon-info.jetswap.finance/token/0x5dd05762b831a977b974db8759772d41f3d5ff0b</a>
 </br>
