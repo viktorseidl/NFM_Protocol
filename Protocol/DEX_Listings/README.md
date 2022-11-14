@@ -33,7 +33,7 @@
 <li>BAT / NFM: 0xda66D9a48325Db42F02604a5790ec72b147be0b6</li>
 </ul>
 
-<h2>SushiSwap</h2></br>
+</br></br><h2>SushiSwap</h2></br>
 <h3>Router Address:</h3>0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506</br>
 
 <h3>Pair Addresses:</h3>
@@ -42,5 +42,49 @@
 <li>WMATIC / NFM: 0x0E9dED1895023Ac5BAc568e2Bde3f12eA6Cb1726</li>
 <li>AVAX / NFM: 0xA3cEdD082E3e878B573ECfD9aDd35918A8E852AD</li>
 <li>NFM / AXS: 0x9B5AcAC264Fec5CC5740FF0AecCe561EC0194bF2</li>
+</ul>
+
+</br></br><h2>UniSwapV3</h2></br>
+<h3>Router Address:</h3>0xE592427A0AEce92De3Edee1F18E0157C05861564</br>
+<a href="https://info.uniswap.org/#/polygon/tokens/0x5dd05762b831a977b974db8759772d41f3d5ff0b">https://info.uniswap.org/#/polygon/tokens/0x5dd05762b831a977b974db8759772d41f3d5ff0b</a>
+</br>
+<h3>Pair Addresses:</h3>
+<ul>
+<li>WBTC / NFM: 0x3a54090728013676d933482567C9E53d82775B32</li>
+<li>NFM / DAI: 0x117b4C027b69EdFc89F6d2C91DeF40E9e27E71Ca</li>
+<li>CRV / NFM: 0x0e0e9F319a702fD65B40A77409A5f4450A8E39C0</li>
+<li>NFM / 1INCH: 0x08CF1A50F9363442AD1BAD8940B78B92e122c41b</li>
+<li>MATIC / NFM: 0xa6C3b77143F049b7C5C4B7f9d4a6944649Ff8ed8</li>
+<li>USDC / NFM: 0x34610783b7E3D105c6A94609698b5A10b0677372</li>
+<li>NFM / WETH: 0x8D8f93572de3CC737678eB315c93d53958dE37C9</li>
+</ul>
+
+</br></br><h2>KyberSwap</h2></br>
+<h3>Router Address:</h3>0x2B1c7b41f6A8F2b2bc45C3233a5d5FB3cD6dC9A8</br>
+<a href="https://analytics.kyberswap.com/elastic/polygon/token/0x5dd05762b831a977b974db8759772d41f3d5ff0b">https://analytics.kyberswap.com/elastic/polygon/token/0x5dd05762b831a977b974db8759772d41f3d5ff0b</a>
+</br>
+<h3>Pair Addresses:</h3>
+<ul>
+<li>NFM / DAI: 0xb86d636F2CbFb173d05C6B60E034e3135d15dCC3</li>
+<li>MATIC / NFM: 0x2953DB616FC8df9bE50c06C55CaEFE3277416668</li>
+<li>NFM / USDT: 0xCC8a5B9208878fa7880c207AD90DBc914DeFbbca</li>
+</ul>
+
+</br></br><h2>ApeSwap</h2></br>
+<h3>Router Address:</h3>0xC0788A3aD43d79aa53B09c2EaCc313A787d1d607</br>
+<a href="https://polygon.info.apeswap.finance/token/0x5dd05762b831a977b974db8759772d41f3d5ff0b">https://polygon.info.apeswap.finance/token/0x5dd05762b831a977b974db8759772d41f3d5ff0b</a>
+</br>
+<h3>Pair Addresses:</h3>
+<ul>
+<li>MATIC / NFM: 0x96b7c28e8a1252a11d5347dcc5302563ff70c9ee</li>
+</ul>
+
+</br></br><h2>JetSwap</h2></br>
+<h3>Router Address:</h3>0x5C6EC38fb0e2609672BDf628B1fD605A523E5923</br>
+<a href="https://polygon-info.jetswap.finance/token/0x5dd05762b831a977b974db8759772d41f3d5ff0b">https://polygon-info.jetswap.finance/token/0x5dd05762b831a977b974db8759772d41f3d5ff0b</a>
+</br>
+<h3>Pair Addresses:</h3>
+<ul>
+<li>MATIC / NFM: 0x3270116d257668a8b8937bd2384dee39073d3ecf</li>
 </ul>
 
