@@ -1,4 +1,10 @@
-// SPDX-License-Identifier: MIT
+/**
+ *Submitted for verification at polygonscan.com on 2022-09-09
+ Polygon Mainnet: 0x4De6aA9c5D735c3bBF4CC8B466a35013117dccaA
+ */
+
+//SPDX-License-Identifier:MIT
+
 pragma solidity ^0.8.13;
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -96,37 +102,10 @@ interface INfmController {
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// INFMSTAKINGRESERVEERC20
+// INFMSTAKING
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-interface INfmStakingReserveERC20 {
-    function _updateStake() external returns (bool);
-
-    function _returnDayCounter() external view returns (uint256);
-
-    function _returnNextUpdateTime() external view returns (uint256);
-
-    function _returnCurrenciesArrayLength() external view returns (uint256);
-
-    function _returnCurrencies()
-        external
-        view
-        returns (address[] memory CurrenciesArray);
-
-    function _returnTotalAmountPerDayForRewards(address Coin, uint256 Day)
-        external
-        view
-        returns (uint256);
-
-    function _returnDailyRewardPer1NFM(address Coin, uint256 Day)
-        external
-        view
-        returns (uint256);
-
-    function _realizePayments(
-        address Coin,
-        uint256 Amount,
-        address Staker
-    ) external returns (bool);
+interface INfmStaking {
+    function _returnDepositsOfDay(uint256 Day) external view returns (uint256);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -166,12 +145,14 @@ interface IERC20 {
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /// @title NFMStaking.sol
 /// @author Fernando Viktor Seidl E-mail: viktorseidl@gmail.com
-/// @notice This contract holds all deposits of the investors and manages them as well as the interest calculations to be generated from them
-/// @dev This contract holds all deposits of the investors and manages them as well as the interest calculations to be generated from them
+/// @notice This contract holds the entire ERC-20 Reserves of the NFM Staking Pool. This contract regulates the
+///         interest to be generated from the investments in the NFM Staking Contract
+/// @dev This contract holds the entire ERC-20 Reserves of the NFM Staking Pool. This contract regulates the
+///      interest to be generated from the investments in the NFM Staking Contract
 ///
 ///
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-contract NFMStaking {
+contract NFMStakeReserveERC20 {
     //include SafeMath
     using SafeMath for uint256;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -185,41 +166,30 @@ contract NFMStaking {
     address private _SController;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    TotalDepositsOnStake        =>  total investments
-    generalIndex                =>  Unique Index
-    CurrenciesReserveArray      =>  Array includes all allowed currencies
-    Staker                      =>  Tuple containing all information about a user and his investment
+    DayCounter          =>  total investments
+    Time24Hours         =>  24 Hours imestamp value
+    NextUpdateTime      =>  Next timestamp to update balances
+    Currencies          =>  Array of all allowed Currencies
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    uint256 public TotalDepositsOnStake;
-    uint256 public generalIndex;
-    address[] public CurrenciesReserveArray;
-    uint256 private _locked = 0;
-    //Struct for each deposit
-    struct Staker {
-        uint256 index;
-        uint256 startday;
-        uint256 inicialtimestamp;
-        uint256 deposittimeDays;
-        uint256 amountNFMStaked;
-        address ofStaker;
-        bool claimed;
-    }
+    uint256 public DayCounter = 0;
+    uint256 public Time24Hours = 86400;
+    uint256 public NextUpdateTime;
+    address[] public Currencies;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     MAPPINGS
-    StakerInfo(UniqueIndex => Tuple Staker)        =>  //GIndex => Staker
-    DepositsOfStaker(Staker address => UniqueIndexes)        =>  //Address Staker => Array GIndexes by Staker
-    TotalStakedPerDay(DayIndex => Totaldeposits)        =>  //Day => TotalDeposits
-    ClaimingConfirmation(UniqueIndex => (Staker address => 0=false 1=true))        =>  //GIndex => Coin address => 1 if paid
-    RewardsToWithdraw(UniqueIndex => Array Amounts)        =>  //Gindex => Array of Claimed Rewards
+    TotalAmountPerDayForRewards(address => (uint256 => uint256)          =>  //Coin => DayCounter => Total Amount per Day for rewards.
+    DailyRewardPer1NFM(address => (uint256 => uint256)                   =>  //Coin => DayCounter => Amount per Day for 1 NFM.
+    TotalRewardSupply(address => uint256)                                =>  //Coin => TotalAmount of Rewards all Time - Payouts
+    TotalRewardsPaid(address => uint256)                                 =>  //Coin => Total of Rewards paid
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    mapping(uint256 => Staker) public StakerInfo;
-    mapping(address => uint256[]) public DepositsOfStaker;
-    mapping(uint256 => uint256) public TotalStakedPerDay;
-    mapping(uint256 => mapping(address => uint256)) public ClaimingConfirmation;
-    mapping(uint256 => uint256[]) public RewardsToWithdraw;
+    mapping(address => mapping(uint256 => uint256))
+        public TotalAmountPerDayForRewards;
+    mapping(address => mapping(uint256 => uint256)) public DailyRewardPer1NFM;
+    mapping(address => uint256) public TotalRewardSupply;
+    mapping(address => uint256) public TotalRewardsPaid;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /* 
     MODIFIER
@@ -235,344 +205,288 @@ contract NFMStaking {
         require(msg.sender != address(0), "0A");
         _;
     }
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    MODIFIER
-    reentrancyGuard       => secures the protocol against reentrancy attacks
-     */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    modifier reentrancyGuard() {
-        require(_locked == 0);
-        _locked = 1;
-        _;
-        _locked = 0;
-    }
 
     constructor(address Controller) {
         _Owner = msg.sender;
         INfmController Cont = INfmController(Controller);
         _Controller = Cont;
         _SController = Controller;
-        generalIndex = 0;
+        NextUpdateTime = block.timestamp + 86400;
+        Currencies.push(Cont._getNFM());
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-        @_updateCurrenciesList() returns (bool);
-        This function checks the currencies in the NFMStakingReserveERC20. If the array in the NFMStakingReserveERC20 is longer, then update array
+        @_addCurrencies(address) returns (bool);
+        This function adds new currencies to the array
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _updateCurrenciesList() internal onlyOwner returns (bool) {
-        if (
-            CurrenciesReserveArray.length <
-            INfmStakingReserveERC20(
-                address(_Controller._getNFMStakingTreasuryERC20())
-            )._returnCurrenciesArrayLength()
-        ) {
-            CurrenciesReserveArray = INfmStakingReserveERC20(
-                address(_Controller._getNFMStakingTreasuryERC20())
-            )._returnCurrencies();
-        }
+    function _addCurrencies(address Coin) public onlyOwner returns (bool) {
+        Currencies.push(Coin);
         return true;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-        @_returnTotalDepositsOnStake() returns (uint256);
-        This function returns the total amount of all deposits
+        @_returnBalanceContract(address) returns (uint256);
+        This function returns the contract balance
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _returnTotalDepositsOnStake() public view returns (uint256) {
-        return TotalDepositsOnStake;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-        @_returngeneralIndex() returns (uint256);
-        This function returns the unique Index
-    */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _returngeneralIndex() public view returns (uint256) {
-        return generalIndex;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-        @_returnStakerInfo(uint256) returns (struct Staker);
-        This function returns the complete information of a specific deposit
-    */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _returnStakerInfo(uint256 Gindex)
-        public
-        view
-        returns (Staker memory)
-    {
-        return StakerInfo[Gindex];
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-        @_returnDepositsOfDay(uint256) returns (uint256);
-        This function returns all deposits of a specific day
-    */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _returnDepositsOfDay(uint256 Day) public view returns (uint256) {
-        return TotalStakedPerDay[Day];
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-        @_returnDepositsOfStaker() returns (uint256[]);
-        This function returns all deposits from a specific investor
-    */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _returnDepositsOfStaker() public view returns (uint256[] memory) {
-        return DepositsOfStaker[msg.sender];
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-        @_returnClaimingConfirmation(address, uint256) returns (uint256);
-        This function returns a numeric boolean whether the withdrawal has occurred
-    */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _returnClaimingConfirmation(address Coin, uint256 Gindex)
+    function _returnBalanceContract(address Currency)
         public
         view
         returns (uint256)
     {
-        return ClaimingConfirmation[Gindex][Coin];
+        return IERC20(address(Currency)).balanceOf(address(this));
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-        @_setDepositOnDailyMap(uint256,uint256,uint256) returns (bool);
-        This function saves the deposit in the appropriate times for calculation.
+        @_returnDayCounter() returns (uint256);
+        This function returns the actual Day
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _setDepositOnDailyMap(
-        uint256 Amount,
-        uint256 Startday,
-        uint256 Period
-    ) internal onlyOwner returns (bool) {
-        for (uint256 i = Startday; i < (Startday + Period); i++) {
-            TotalStakedPerDay[i] += Amount;
-        }
-        return true;
+    function _returnDayCounter() public view returns (uint256) {
+        return DayCounter;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-        @_calculateRewardPerDeposit(address, uint256, uint256) returns (uint256);
-        This function calculates interest on a specific day for a specific deposit.
+        @_returnNextUpdateTime() returns (uint256);
+        This function returns the next update timestamp
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _calculateRewardPerDeposit(
-        address Coin,
-        uint256 RewardAmount,
-        uint256 DepositAmount
-    ) public view returns (uint256) {
-        uint256 CoinDecimal = IERC20(address(Coin)).decimals();
+    function _returnNextUpdateTime() public view returns (uint256) {
+        return NextUpdateTime;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnCurrencies() returns (address[]);
+        This function returns an Array of all allowed currencies
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returnCurrencies()
+        public
+        view
+        returns (address[] memory CurrenciesArray)
+    {
+        return Currencies;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnCurrenciesArrayLength() returns (uint256);
+        This function returns the length of the Array of all allowed currencies
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returnCurrenciesArrayLength() public view returns (uint256) {
+        return Currencies.length;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnTotalAmountPerDayForRewards(address, uint256) returns (uint256);
+        This function returns the daily total amount of reward
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returnTotalAmountPerDayForRewards(address Coin, uint256 Day)
+        public
+        view
+        returns (uint256)
+    {
+        return TotalAmountPerDayForRewards[Coin][Day];
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnDailyRewardPer1NFM(address, uint256) returns (uint256);
+        This function returns the daily amount of reward for 1 NFM
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returnDailyRewardPer1NFM(address Coin, uint256 Day)
+        public
+        view
+        returns (uint256)
+    {
+        return DailyRewardPer1NFM[Coin][Day];
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnDailyRewardPer1NFM(address, uint256) returns (uint256);
+        This function returns the daily amount of reward for 1 NFM
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returnSecondRewardPer1NFM(address Coin, uint256 Day)
+        public
+        view
+        returns (uint256)
+    {
+        return SafeMath.div(DailyRewardPer1NFM[Coin][Day], 86400);
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnTotalRewardSupply(address) returns (uint256);
+        This function returns the total monitored Reward balance
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returnTotalRewardSupply(address Coin)
+        public
+        view
+        returns (uint256)
+    {
+        return TotalRewardSupply[Coin];
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_returnTotalRewardsPaid(address) returns (uint256);
+        This function returns the total Rewards paid
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _returnTotalRewardsPaid(address Coin)
+        public
+        view
+        returns (uint256)
+    {
+        return TotalRewardsPaid[Coin];
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_remainingFromDayAgoRewards(address, uint256) returns (uint256);
+        This function returns the total remaining rewards from a day ago
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _remainingFromDayAgoRewards(address Currency, uint256 Day)
+        public
+        view
+        returns (uint256)
+    {
+        uint256 CoinDecimal = IERC20(address(Currency)).decimals();
         if (CoinDecimal < 18) {
+            return
+                SafeMath.sub(
+                    TotalAmountPerDayForRewards[Currency][Day],
+                    SafeMath.div(
+                        SafeMath.div(
+                            SafeMath.mul(
+                                INfmStaking(_Controller._getNFMStaking())
+                                    ._returnDepositsOfDay(Day),
+                                (DailyRewardPer1NFM[Currency][Day] *
+                                    10**(18 - CoinDecimal))
+                            ),
+                            10**18
+                        ),
+                        (10**(18 - CoinDecimal))
+                    )
+                );
+        } else {
+            return
+                SafeMath.sub(
+                    TotalAmountPerDayForRewards[Currency][Day],
+                    SafeMath.div(
+                        SafeMath.mul(
+                            INfmStaking(_Controller._getNFMStaking())
+                                ._returnDepositsOfDay(Day),
+                            DailyRewardPer1NFM[Currency][Day]
+                        ),
+                        10**18
+                    )
+                );
+        }
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_calculateRewardPerNFM(address, uint256) returns (uint256);
+        This function calculates the rewards per 1 NFM
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _calculateRewardPerNFM(address Currency, uint256 Day)
+        public
+        view
+        returns (uint256)
+    {
+        uint256 CoinDecimal = IERC20(address(Currency)).decimals();
+        if (CoinDecimal < 18) {
+            //Totalamountperdayforrewards divided by totalssupply of NFM Contract
             return
                 SafeMath.div(
                     SafeMath.div(
-                        SafeMath.mul(
-                            (RewardAmount * 10**(18 - CoinDecimal)),
-                            DepositAmount
+                        (
+                            (TotalAmountPerDayForRewards[Currency][Day] *
+                                10**(18 - CoinDecimal) *
+                                10**18)
                         ),
-                        10**18
+                        IERC20(address(_Controller._getNFM())).totalSupply()
                     ),
                     (10**(18 - CoinDecimal))
                 );
         } else {
             return
-                SafeMath.div(SafeMath.mul(RewardAmount, DepositAmount), 10**18);
+                SafeMath.div(
+                    (TotalAmountPerDayForRewards[Currency][Day] * 10**18),
+                    IERC20(address(_Controller._getNFM())).totalSupply()
+                );
         }
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-        @_calculateEarnings(address, uint256, uint256, uint256) returns (uint256);
-        This function calculates the total interest on a specific day for a specific period on a deposit.
+        @_updateStake() returns (bool);
+        This function updates all important balances for the necessary calculations
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _calculateEarnings(
+    function _updateStake() public onlyOwner returns (bool) {
+        require(NextUpdateTime < block.timestamp, "NT");
+        if (NextUpdateTime < block.timestamp) {
+            DayCounter++;
+            NextUpdateTime = NextUpdateTime + Time24Hours;
+        }
+        for (uint256 i = 0; i < Currencies.length; i++) {
+            TotalAmountPerDayForRewards[Currencies[i]][DayCounter] =
+                (_returnBalanceContract(Currencies[i]) -
+                    TotalRewardSupply[Currencies[i]]) +
+                _remainingFromDayAgoRewards(Currencies[i], DayCounter - 1);
+            TotalRewardSupply[Currencies[i]] = _returnBalanceContract(
+                Currencies[i]
+            );
+            DailyRewardPer1NFM[Currencies[i]][
+                DayCounter
+            ] = _calculateRewardPerNFM(Currencies[i], DayCounter);
+        }
+        return true;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+        @_realizePayments(address, uint256, address) returns (bool);
+        This function executes the payouts
+    */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _realizePayments(
         address Coin,
-        uint256 StakedAmount,
-        uint256 StartDay,
-        uint256 Period
-    ) public view returns (uint256) {
-        uint256 Earned;
-        for (uint256 i = StartDay; i < (StartDay + Period); i++) {
-            Earned += _calculateRewardPerDeposit(
-                Coin,
-                INfmStakingReserveERC20(
-                    address(_Controller._getNFMStakingTreasuryERC20())
-                )._returnDailyRewardPer1NFM(Coin, i),
-                StakedAmount
-            );
+        uint256 Amount,
+        address Staker
+    ) public onlyOwner returns (bool) {
+        require(msg.sender != address(0), "0A");
+        require(Staker != address(0), "0A");
+        if (Amount > 0) {
+            if (IERC20(address(Coin)).transfer(Staker, Amount) == true) {
+                TotalRewardSupply[Coin] -= Amount;
+                TotalRewardsPaid[Coin] += Amount;
+            }
         }
-        return Earned;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-        @_deposit(uint256, uint256) returns (bool);
-        This function invests an amount X of NFM in this contract. The NFM must be released beforehand to the contract by means of approval
-    */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _deposit(uint256 Amount, uint256 Period) public returns (bool) {
-        if (
-            INfmStakingReserveERC20(
-                address(_Controller._getNFMStakingTreasuryERC20())
-            )._returnNextUpdateTime() < block.timestamp
-        ) {
-            require(
-                INfmStakingReserveERC20(
-                    address(_Controller._getNFMStakingTreasuryERC20())
-                )._updateStake() == true,
-                "NU"
-            );
-        }
-        _updateCurrenciesList();
-        require(
-            Period == 7 ||
-                Period == 15 ||
-                Period == 30 ||
-                Period == 45 ||
-                Period == 60,
-            "NIP"
-        );
-        require(
-            IERC20(address(_Controller._getNFM())).transferFrom(
-                msg.sender,
-                address(this),
-                Amount
-            ) == true,
-            "<A"
-        );
-        require(
-            _setDepositOnDailyMap(
-                Amount,
-                INfmStakingReserveERC20(
-                    address(_Controller._getNFMStakingTreasuryERC20())
-                )._returnDayCounter(),
-                Period
-            ) == true,
-            "NDD"
-        );
-        StakerInfo[generalIndex] = Staker(
-            generalIndex,
-            INfmStakingReserveERC20(
-                address(_Controller._getNFMStakingTreasuryERC20())
-            )._returnDayCounter(),
-            block.timestamp,
-            Period,
-            Amount,
-            msg.sender,
-            false
-        );
-        TotalDepositsOnStake += Amount;
-        DepositsOfStaker[msg.sender].push(generalIndex);
-        generalIndex++;
-        return true;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-        @_claimRewards(uint256) returns (bool);
-        This function is responsible for claiming the interest
-    */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _claimRewards(uint256 Index)
-        public
-        reentrancyGuard
-        returns (bool)
-    {
-        if (
-            INfmStakingReserveERC20(
-                address(_Controller._getNFMStakingTreasuryERC20())
-            )._returnNextUpdateTime() < block.timestamp
-        ) {
-            require(
-                INfmStakingReserveERC20(
-                    address(_Controller._getNFMStakingTreasuryERC20())
-                )._updateStake() == true,
-                "NU"
-            );
-        }
-        _updateCurrenciesList();
-        require(StakerInfo[Index].ofStaker == msg.sender, "oO");
-        require(
-            StakerInfo[Index].inicialtimestamp +
-                (86400 * StakerInfo[Index].deposittimeDays) <
-                block.timestamp,
-            "CNT"
-        );
-        require(StakerInfo[Index].claimed == false, "AC");
-        for (uint256 i = 0; i < CurrenciesReserveArray.length; i++) {
-            RewardsToWithdraw[Index].push(
-                _calculateEarnings(
-                    CurrenciesReserveArray[i],
-                    StakerInfo[Index].amountNFMStaked,
-                    StakerInfo[Index].startday,
-                    StakerInfo[Index].deposittimeDays
-                )
-            );
-        }
-        StakerInfo[Index].claimed = true;
-        return true;
-    }
-
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-        @_withdrawDepositAndRewards(uint256) returns (bool);
-        This function is responsible for the payment and withdrawal of interest and deposit
-    */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _withdrawDepositAndRewards(uint256 Index)
-        public
-        reentrancyGuard
-        returns (bool)
-    {
-        require(ClaimingConfirmation[Index][_Controller._getNFM()] == 0, "AW");
-        require(
-            StakerInfo[Index].inicialtimestamp +
-                (86400 * StakerInfo[Index].deposittimeDays) <
-                block.timestamp,
-            "CNT"
-        );
-        require(StakerInfo[Index].claimed == true, "AC");
-        require(StakerInfo[Index].ofStaker == msg.sender, "oO");
-        for (uint256 i = 0; i < RewardsToWithdraw[Index].length; i++) {
-            require(
-                INfmStakingReserveERC20(
-                    address(_Controller._getNFMStakingTreasuryERC20())
-                )._realizePayments(
-                        CurrenciesReserveArray[i],
-                        RewardsToWithdraw[Index][i],
-                        msg.sender
-                    ) == true,
-                "NP"
-            );
-            ClaimingConfirmation[Index][CurrenciesReserveArray[i]] = 1;
-        }
-        require(
-            IERC20(address(_Controller._getNFM())).transfer(
-                msg.sender,
-                StakerInfo[Index].amountNFMStaked
-            ) == true,
-            "NDP"
-        );
-        TotalDepositsOnStake -= StakerInfo[Index].amountNFMStaked;
         return true;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     @_getWithdraw(address Coin,address To,uint256 amount,bool percent) returns (bool);
-    This function is used by Vault Contracts for generating addictional income on Investments.
+    This function is used by Vault Contracts.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     function _getWithdraw(
@@ -589,12 +503,15 @@ contract NFMStaking {
                 SafeMath.mul(CoinAmount, amount),
                 100
             );
+            TotalRewardSupply[Coin] -= AmountToSend;
             IERC20(address(Coin)).transfer(To, AmountToSend);
             return true;
         } else {
             if (amount == 0) {
+                TotalRewardSupply[Coin] -= CoinAmount;
                 IERC20(address(Coin)).transfer(To, CoinAmount);
             } else {
+                TotalRewardSupply[Coin] -= amount;
                 IERC20(address(Coin)).transfer(To, amount);
             }
             return true;

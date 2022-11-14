@@ -1,3 +1,8 @@
+/**
+ *Submitted for verification at polygonscan.com on 2022-08-27
+ Polygon Mainnet: 0x269BCb03FA2903de58aC5CE50854fb9a43F73a37
+*/
+
 //SPDX-License-Identifier:MIT
 
 pragma solidity ^0.8.13;
@@ -88,104 +93,189 @@ interface INfmController {
         returns (bool);
 
     function _getNFM() external pure returns (address);
+
+    function _getUV2Pool() external pure returns (address);
+
+    function _getBonusBuyBack() external pure returns (address, address);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // IERC20
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface IERC20 {
-    function decimals() external view returns (uint256);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    event Approval(
+        address indexed owner,
+        address indexed spender,
+        uint256 value
+    );
 
     function totalSupply() external view returns (uint256);
+
+    function decimals() external view returns (uint256);
+
+    function balanceOf(address account) external view returns (uint256);
+
+    function transfer(address to, uint256 amount) external returns (bool);
+
+    function allowance(address owner, address spender)
+        external
+        view
+        returns (uint256);
+
+    function approve(address spender, uint256 amount) external returns (bool);
+
+    function transferFrom(
+        address from,
+        address to,
+        uint256 amount
+    ) external returns (bool);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-/// @title NFMBurning.sol
+/// @title NFMTreasury.sol
 /// @author Fernando Viktor Seidl E-mail: viktorseidl@gmail.com
-/// @notice This contract regulates the burning of the NFM token and initializes itself after 4 years of logic launch
-/// @dev As soon as the timestamp for Burning Start has passed, the Burning initializes. A mechanism in the transfer
-///           protocol of the NFM token then automatically charges a burning fee of 4%. This amount is then automatically
-///           deducted from the amount sent.
-///           This burning process is structured as follows:
-///             - 2% burning fee
-///             - 2% community fee
+/// @notice This contract serves as Treasury for the NFM project. Funds are used for Marketing strategies, accounting, and investments.
+/// @dev This extension regulates project Investments.
 ///
-///             As soon as the total supply of the NFM has reached 1,000,000,000 then the 2% burning fee will be converted
-///             into a community fee. From then on, there will be a lifelong 4% community fee on every Transaction.
-///                     ***The fee is only charged if the transaction exceeds a minimum amount of 2 NFM.***
-///             ***All internal smart contracts belonging to the controller are excluded from the Burning Events.***
+///
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-contract NFMBurning {
+contract NFMTreasury {
     //include SafeMath
     using SafeMath for uint256;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     CONTROLLER
     OWNER = MSG.SENDER ownership will be handed over to dao
-     */
+    */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     INfmController private _Controller;
     address private _Owner;
+    address private _SController;
+    uint256 private _MaticCount;
+    uint256 private _locked = 0;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    FinalTotalSupply    => 1,000,000,000 NFM
-    Once this amount has been reached, the burning will stop and the 2% will be an additional community fee. In addition, 
-    the BuyBack Program begins when the burning ends
+    MODIFIER
+    onlyOwner       => Only Controller listed Contracts and Owner can interact with this contract.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    uint256 private FinalTotalSupply = 1000000000 * 10**18;
+    modifier onlyOwner() {
+        require(
+            _Controller._checkWLSC(_SController, msg.sender) == true ||
+                _Owner == msg.sender,
+            "oO"
+        );
+        require(msg.sender != address(0), "0A");
+        _;
+    }
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    MODIFIER
+    reentrancyGuard       => Security against Reentrancy attacks
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    modifier reentrancyGuard() {
+        require(_locked == 0);
+        _locked = 1;
+        _;
+        _locked = 0;
+    }
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    EVENT
+    Received(address caller, uint amount)       => Tracks Matic deposits
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    event Received(address caller, uint256 amount);
 
     constructor(address Controller) {
         _Owner = msg.sender;
         INfmController Cont = INfmController(Controller);
         _Controller = Cont;
+        _SController = Controller;
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    @checkburn(uint256 amount) returns (bool, bool, uint256, uint256);
-    This function checks the burning if the final amount of 1 billion has not yet been reached and returns the following parameters to the calling
-    contract:
-        - Status whether burning is necessary (true if yes and false if not)
-        - Type of fee (true Burning if burning fee and false if only community fee)
-        - Burning Fee amount on the transaction
-        - Community Fee amount on the transaction               
+    receive() external payable       => deposits with msg.data
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function checkburn(uint256 amount)
+    receive() external payable {
+        _MaticCount += msg.value;
+        emit Received(msg.sender, msg.value);
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    fallback() external payable       => deposits without msg.data
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    fallback() external payable {
+        _MaticCount += msg.value;
+        emit Received(msg.sender, msg.value);
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    getBalance() preturns (uint256)      => Shows balance of Matic
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function getBalance() public view returns (uint256) {
+        return address(this).balance;
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    sendViaCall(address payable _to, uint256 amount) public onlyOwner reentrancyGuard payable
+    Is called for Matic transfers out of the contract
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function sendViaCall(address payable _to, uint256 amount)
         public
-        view
-        returns (
-            bool state,
-            bool typ,
-            uint256 bfee,
-            uint256 stakefee
-        )
+        payable
+        onlyOwner
+        reentrancyGuard
     {
-        //RESTING FEES IF BURNING STARTED
-        uint256 burnfee = 0;
-        if (amount > 2 * 10**18) {
-            burnfee = _calcFee(amount);
-            uint256 lasting = IERC20(address(_Controller._getNFM()))
-                .totalSupply() - burnfee;
-            if (lasting >= 1000000000 * 10**18) {
-                return (true, true, burnfee, burnfee);
-            } else {
-                return (true, false, 0, burnfee);
-            }
-        } else {
-            return (false, false, 0, 0);
-        }
+        _MaticCount -= amount;
+        (bool sent, ) = _to.call{value: amount}("");
+        require(sent, "Failed to send Ether");
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    @_calcFee(uint256 amount) returns (uint256);
-    This function calculates the 2% fee on the transaction
+    @withdraw(address Coin, address To, uint256 amount, bool percent) returns (bool);
+    This function is responsible for the withdraw.
+    There are 3 ways to initiate payouts. Either as a fixed amount, the full amount or a percentage of the balance.
+    Fixed Amount    =>   Address Coin, Address Receiver, Fixed Amount, false
+    Total Amount     =>   Address Coin, Address Receiver, 0, false
+    A percentage     =>   Address Coin, Address Receiver, percentage, true
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _calcFee(uint256 amount) public pure returns (uint256) {
-        uint256 burnPercent = SafeMath.div(SafeMath.mul(amount, 2), 100);
-        return burnPercent;
+    function withdraw(
+        address Coin,
+        address To,
+        uint256 amount,
+        bool percent
+    ) public onlyOwner returns (bool) {
+        require(To != address(0), "0A");
+        uint256 CoinAmount = IERC20(address(Coin)).balanceOf(address(this));
+        if (percent == true) {
+            //makeCalcs on Percentatge
+            uint256 AmountToSend = SafeMath.div(
+                SafeMath.mul(CoinAmount, amount),
+                100
+            );
+            IERC20(address(Coin)).transfer(To, AmountToSend);
+            return true;
+        } else {
+            if (amount == 0) {
+                IERC20(address(Coin)).transfer(To, CoinAmount);
+            } else {
+                IERC20(address(Coin)).transfer(To, amount);
+            }
+            return true;
+        }
     }
 }

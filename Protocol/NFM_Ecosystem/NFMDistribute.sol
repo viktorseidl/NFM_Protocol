@@ -1,3 +1,8 @@
+/**
+ *Submitted for verification at polygonscan.com on 2022-08-26
+ Polygon Mainnet: 0xE6d69e99FD18fcdA9a29Dcdc39A561Ed08b9FF39
+*/
+
 //SPDX-License-Identifier:MIT
 
 pragma solidity ^0.8.13;
@@ -87,70 +92,53 @@ interface INfmController {
         pure
         returns (bool);
 
-    function _getController() external pure returns (address);
-
-    function _getExchange() external pure returns (address);
+    function _getNFM() external pure returns (address);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// INFMEXCHANGE
+// IERC20
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-interface INfmExchange {
-    function setPriceOracle(address Coin, uint256[] memory Price)
-        external
-        returns (bool);
-}
+interface IERC20 {
+    event Transfer(address indexed from, address indexed to, uint256 value);
 
-//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// IAGGREGATORV3INTERFACE Chainlink DataFeeds https://docs.chain.link/docs/using-chainlink-reference-contracts/
-//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-interface AggregatorV3Interface {
-    function decimals() external view returns (uint8);
+    event Approval(
+        address indexed owner,
+        address indexed spender,
+        uint256 value
+    );
 
-    function description() external view returns (string memory);
+    function totalSupply() external view returns (uint256);
 
-    function version() external view returns (uint256);
+    function decimals() external view returns (uint256);
 
-    // getRoundData and latestRoundData should both raise "No data present"
-    // if they do not have data to report, instead of returning unset values
-    // which could be misinterpreted as actual reported values.
-    function getRoundData(uint80 _roundId)
+    function balanceOf(address account) external view returns (uint256);
+
+    function transfer(address to, uint256 amount) external returns (bool);
+
+    function allowance(address owner, address spender)
         external
         view
-        returns (
-            uint80 roundId,
-            uint256 answer,
-            uint256 startedAt,
-            uint256 updatedAt,
-            uint80 answeredInRound
-        );
+        returns (uint256);
 
-    function latestRoundData()
-        external
-        view
-        returns (
-            uint80 roundId,
-            uint256 answer,
-            uint256 startedAt,
-            uint256 updatedAt,
-            uint80 answeredInRound
-        );
+    function approve(address spender, uint256 amount) external returns (bool);
+
+    function transferFrom(
+        address from,
+        address to,
+        uint256 amount
+    ) external returns (bool);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-/// @title NFMOracle.sol
+/// @title NFMDistribute.sol
 /// @author Fernando Viktor Seidl E-mail: viktorseidl@gmail.com
-/// @notice This contract includes Chainlink's AggregatorV3 interface. This enables the contract to query the current
-///                prices for currencies.
-/// @dev In order for the contract to cover all the necessary currencies that NFTISM requires, functions have been reworked
-///            to extend the currencies infinitely.
+/// @notice This contract is responsible for the distribution of the Developer Funds to all participants.
+/// @dev This extension includes all necessary functionalities for distributing the Funds.
 ///
-///         INTERACTING CONTRACTS OF NFTISMUS:
-///         -   NFMLiquidity.sol
-///         -   NFMExchange.sol
-///             Polygon Pricefeeds of Chainlink https://docs.chain.link/docs/matic-addresses/
+///
+///
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-contract NFMOracle {
+contract NFMDistribute {
     //include SafeMath
     using SafeMath for uint256;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -159,18 +147,18 @@ contract NFMOracle {
     OWNER = MSG.SENDER ownership will be handed over to dao
     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    address private _Owner;
     INfmController private _Controller;
+    address private _Owner;
     address private _SController;
-
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    MAPPINGS
-    _Oracle (ERC20 address, AggregatorV3Interface);                 //Records when payments have been made
-     */
+    address[] _PArray       => Contains the Distribution Array
+    uint256 Index           => Contains the upcoming index 
+    */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    mapping(address => AggregatorV3Interface) public _Oracle;
-    mapping(address => uint256) public _OracleSet;
+    address[] public _PArray;
+
+    mapping(address => bool) public _isP_allowed;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     MODIFIER
@@ -178,85 +166,112 @@ contract NFMOracle {
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     modifier onlyOwner() {
-        require(
-            _Controller._checkWLSC(_SController, msg.sender) == true ||
-                _Owner == msg.sender,
-            "oO"
-        );
+        require(_Owner == msg.sender, "oO");
         require(msg.sender != address(0), "0A");
         _;
     }
 
-    constructor(
-        address MkrAddress,
-        address BtcAddress,
-        address DaiAddress,
-        address WethAddress,
-        address WmaticAddress,
-        address Controller
-    ) {
+    constructor(address Controller) {
         _Owner = msg.sender;
-        INfmController Cont = INfmController(address(Controller));
+        INfmController Cont = INfmController(Controller);
         _Controller = Cont;
         _SController = Controller;
-        _Oracle[MkrAddress] = AggregatorV3Interface(
-            0xa070427bF5bA5709f70e98b94Cb2F435a242C46C
-        );
-        _OracleSet[MkrAddress] = 1;
-        _Oracle[BtcAddress] = AggregatorV3Interface(
-            0xc907E116054Ad103354f2D350FD2514433D57F6f
-        );
-        _OracleSet[BtcAddress] = 1;
-        _Oracle[DaiAddress] = AggregatorV3Interface(
-            0x4746DeC9e833A82EC7C2C1356372CcF2cfcD2F3D
-        );
-        _OracleSet[DaiAddress] = 1;
-        _Oracle[WethAddress] = AggregatorV3Interface(
-            0xF9680D99D6C9589e2a93a78A04A279e509205945
-        );
-        _OracleSet[WethAddress] = 1;
-        _Oracle[WmaticAddress] = AggregatorV3Interface(
-            0xAB594600376Ec9fD91F8e885dADF0CE036862dE0
-        );
-        _OracleSet[WmaticAddress] = 1;
     }
 
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @_addCurrencies(address Coin, address Aggregators) returns (bool);
-    This feature further adds PriceFeed currencies for queries.
-     */
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _addCurrencies(address Coin, address Aggregators)
+    function allowOrblockP(address Person) public onlyOwner returns (bool) {
+        if (_isP_allowed[Person] == true) {
+            _isP_allowed[Person] = false;
+        } else {
+            _isP_allowed[Person] = true;
+        }
+        return true;
+    }
+
+    function showAddressArray()
+        public
+        view
+        onlyOwner
+        returns (address[] memory Array)
+    {
+        return _PArray;
+    }
+
+    function addP(address Person) public onlyOwner returns (bool) {
+        _PArray.push(Person);
+        _isP_allowed[Person] = true;
+        return true;
+    }
+
+    function makecalculationsAndSendNFM(address Coin)
         public
         onlyOwner
         returns (bool)
     {
-        _Oracle[Coin] = AggregatorV3Interface(address(Aggregators));
-        _OracleSet[Coin] = 1;
-        return true;
+        uint256 balanceCoin = IERC20(address(Coin)).balanceOf(address(this));
+        uint256 allcount = 0;
+        uint256 Pcount = 0;
+        uint256 i = 0;
+        for (i; i < _PArray.length; i++) {
+            if (_isP_allowed[_PArray[i]] == true) {
+                Pcount++;
+            }
+        }
+        i = 0;
+        uint256 payCount = 0;
+        uint256 Ppercent = SafeMath.div(100, Pcount);
+        uint256 share = SafeMath.div(SafeMath.mul(balanceCoin, Ppercent), 100);
+        for (i; i < _PArray.length; i++) {
+            if (payCount == Pcount - 1) {
+                if (_isP_allowed[_PArray[i]] == true) {
+                    IERC20(address(Coin)).transfer(
+                        _PArray[i],
+                        SafeMath.sub(balanceCoin, allcount)
+                    );
+                }
+            } else {
+                if (_isP_allowed[_PArray[i]] == true) {
+                    IERC20(address(Coin)).transfer(_PArray[i], share);
+                    allcount += share;
+                    payCount++;
+                }
+            }
+        }
+        if (IERC20(address(Coin)).balanceOf(address(this)) == 0) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    @_getLatestPrice(address coin) returns (uint256);
-    This function returns the current dollar price of a currency in 6 digit format.
+    @_getWithdraw(address Coin,address To,uint256 amount,bool percent) returns (bool);
+    This function is used by NFMLiquidity and NFM Swap to execute transactions.
      */
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _getLatestPrice(address coin) public view returns (uint256) {
-        if (_OracleSet[coin] > 0) {
-            (
-                ,
-                /*uint80 roundID*/
-                uint256 price, /*uint startedAt*/ /*uint timeStamp*/ /*uint80 answeredInRound*/
-                ,
-                ,
-
-            ) = _Oracle[coin].latestRoundData();
-            price = SafeMath.div(price, 10**2);
-            return price;
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _getWithdraw(
+        address Coin,
+        address To,
+        uint256 amount,
+        bool percent
+    ) public onlyOwner returns (bool) {
+        require(To != address(0), "0A");
+        uint256 CoinAmount = IERC20(address(Coin)).balanceOf(address(this));
+        if (percent == true) {
+            //makeCalcs on Percentatge
+            uint256 AmountToSend = SafeMath.div(
+                SafeMath.mul(CoinAmount, amount),
+                100
+            );
+            IERC20(address(Coin)).transfer(To, AmountToSend);
+            return true;
         } else {
-            return 0;
+            if (amount == 0) {
+                IERC20(address(Coin)).transfer(To, CoinAmount);
+            } else {
+                IERC20(address(Coin)).transfer(To, amount);
+            }
+            return true;
         }
     }
 }

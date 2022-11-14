@@ -1,3 +1,8 @@
+/**
+ *Submitted for verification at polygonscan.com on 2022-07-18
+ Polygon Mainnet: 0x40376Db2e7e59ABD75E9d773Bd9b6F347616ad74
+ */
+
 //SPDX-License-Identifier:MIT
 
 pragma solidity ^0.8.13;
@@ -94,153 +99,98 @@ interface INfmController {
 // IERC20
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface IERC20 {
-    event Transfer(address indexed from, address indexed to, uint256 value);
-
-    event Approval(
-        address indexed owner,
-        address indexed spender,
-        uint256 value
-    );
-
-    function totalSupply() external view returns (uint256);
-
     function decimals() external view returns (uint256);
 
-    function balanceOf(address account) external view returns (uint256);
-
-    function transfer(address to, uint256 amount) external returns (bool);
-
-    function allowance(address owner, address spender)
-        external
-        view
-        returns (uint256);
-
-    function approve(address spender, uint256 amount) external returns (bool);
-
-    function transferFrom(
-        address from,
-        address to,
-        uint256 amount
-    ) external returns (bool);
+    function totalSupply() external view returns (uint256);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// INFMORACLE
-//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-interface INfmOracle {
-    function _getLatestPrice(address coin) external view returns (uint256);
-
-    function _addtoOracle(address Coin, uint256 Price) external returns (bool);
-}
-
-//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-/// @title NFMUniswap.sol
+/// @title NFMBurning.sol
 /// @author Fernando Viktor Seidl E-mail: viktorseidl@gmail.com
-/// @notice This contract is responsible for the Uniswap Protocol and supports the NFMSwap and NFMLiquidity Protocol.
-///                All currencies for the NFMSwap and NFMLiquidity Protocol are sourced from this contract.
-/// @dev This extension includes all necessary functionalities for redeeming the Liquidity Token after 11 years.
+/// @notice This contract regulates the burning of the NFM token and initializes itself after 4 years of logic launch
+/// @dev As soon as the timestamp for Burning Start has passed, the Burning initializes. A mechanism in the transfer
+///           protocol of the NFM token then automatically charges a burning fee of 4%. This amount is then automatically
+///           deducted from the amount sent.
+///           This burning process is structured as follows:
+///             - 2% burning fee
+///             - 2% community fee
 ///
-///         INFO:
-///         -   After 11 years, all existing liquidity tokens are redeemed in a 29-day cycle and the profits are divided accordingly.
-///
+///             As soon as the total supply of the NFM has reached 1,000,000,000 then the 2% burning fee will be converted
+///             into a community fee. From then on, there will be a lifelong 4% community fee on every Transaction.
+///                     ***The fee is only charged if the transaction exceeds a minimum amount of 2 NFM.***
+///             ***All internal smart contracts belonging to the controller are excluded from the Burning Events.***
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-contract NFMDistribute {
+contract NFMBurning {
     //include SafeMath
     using SafeMath for uint256;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     CONTROLLER
     OWNER = MSG.SENDER ownership will be handed over to dao
-    */
+     */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     INfmController private _Controller;
     address private _Owner;
-    address private _SController;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    address[] _CoinsArray       => Contains the all allowed currencies
-    uint256 Index                 => Contains the upcoming index 
-    */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    address[] public _CoinsArray;
-    uint256 public Index = 0;
-    
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    MAPPINGS
-    DistPercent (Coin address, address , factor)     //Contains factor
-    DistAllowed (Coin address, address , bool)     //Contains boolean
+    FinalTotalSupply    => 1,000,000,000 NFM
+    Once this amount has been reached, the burning will stop and the 2% will be an additional community fee. In addition, 
+    the BuyBack Program begins when the burning ends
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    mapping(address => mapping(address=>uint)) public DistPercent;
-    mapping(address => mapping(address=>bool)) public DistAllowed;
-    
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    MODIFIER
-    onlyOwner       => Only Controller listed Contracts and Owner can interact with this contract.
-     */
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    modifier onlyOwner() {
-        require(
-            _Controller._checkWLSC(_SController, msg.sender) == true ||
-                _Owner == msg.sender,
-            "oO"
-        );
-        require(msg.sender != address(0), "0A");
-        _;
-    }
- 
-    constructor(address Controller, address Router) {
+    uint256 private FinalTotalSupply = 1000000000 * 10**18;
+
+    constructor(address Controller) {
         _Owner = msg.sender;
         INfmController Cont = INfmController(Controller);
         _Controller = Cont;
-        _SController = Controller;
     }
 
-   
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
-    @addCoinToList(address Coin) returns (bool);
-    This function adds new Coins to the End of the Array.
-     */
-    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function addCoinToList(address Coin) public onlyOwner returns (bool) {
-        _CoinsArray.push(Coin);
-       
-        return true;
-    }
-
-    
-    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    /*
-    @_getWithdraw(address Coin,address To,uint256 amount,bool percent) returns (bool);
-    This function is used by NFMLiquidity and NFM Swap to execute transactions.
+    @checkburn(uint256 amount) returns (bool, bool, uint256, uint256);
+    This function checks the burning if the final amount of 1 billion has not yet been reached and returns the following parameters to the calling
+    contract:
+        - Status whether burning is necessary (true if yes and false if not)
+        - Type of fee (true Burning if burning fee and false if only community fee)
+        - Burning Fee amount on the transaction
+        - Community Fee amount on the transaction               
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function _getWithdraw(
-        address Coin,
-        address To,
-        uint256 amount,
-        bool percent
-    ) public onlyOwner returns (bool) {
-        require(To != address(0), "0A");
-        uint256 CoinAmount = IERC20(address(Coin)).balanceOf(address(this));
-        if (percent == true) {
-            //makeCalcs on Percentatge
-            uint256 AmountToSend = SafeMath.div(
-                SafeMath.mul(CoinAmount, amount),
-                100
-            );
-            IERC20(address(Coin)).transfer(To, AmountToSend);
-            return true;
-        } else {
-            if (amount == 0) {
-                IERC20(address(Coin)).transfer(To, CoinAmount);
+    function checkburn(uint256 amount)
+        public
+        view
+        returns (
+            bool state,
+            bool typ,
+            uint256 bfee,
+            uint256 stakefee
+        )
+    {
+        //RESTING FEES IF BURNING STARTED
+        uint256 burnfee = 0;
+        if (amount > 2 * 10**18) {
+            burnfee = _calcFee(amount);
+            uint256 lasting = IERC20(address(_Controller._getNFM()))
+                .totalSupply() - burnfee;
+            if (lasting >= 1000000000 * 10**18) {
+                return (true, true, burnfee, burnfee);
             } else {
-                IERC20(address(Coin)).transfer(To, amount);
+                return (true, false, 0, burnfee);
             }
-            return true;
+        } else {
+            return (false, false, 0, 0);
         }
+    }
+
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    /*
+    @_calcFee(uint256 amount) returns (uint256);
+    This function calculates the 2% fee on the transaction
+     */
+    //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    function _calcFee(uint256 amount) public pure returns (uint256) {
+        uint256 burnPercent = SafeMath.div(SafeMath.mul(amount, 2), 100);
+        return burnPercent;
     }
 }

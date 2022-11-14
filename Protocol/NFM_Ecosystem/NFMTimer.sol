@@ -1,3 +1,8 @@
+/**
+ *Submitted for verification at polygonscan.com on 2022-07-07
+ Polygon Mainnet: 0x096b442bB394C8283E948D98cd6E6354FcA6d7d9
+*/
+
 //SPDX-License-Identifier:MIT
 
 pragma solidity ^0.8.13;
@@ -189,24 +194,18 @@ contract NFMTimer {
             //Test Bonus
         } else if (timernum == 5) {
             _ExtraBonusAll = btimestamp;
-            //Test Bonus
-        } else if (timernum == 6) {
-            _ExtraBonusAllEnd = btimestamp;
             //Test BuyBack
-        } else if (timernum == 7) {
+        } else if (timernum == 6) {
             _StartBuyBack = btimestamp;
             //Test Burning
-        } else if (timernum == 8) {
+        } else if (timernum == 7) {
             _StartBurn = btimestamp;
             //Test Countdown
-        } else if (timernum == 9) {
+        } else if (timernum == 8) {
             _SetUpLogicCountdown = btimestamp;
             //Test Airdrop
-        } else if (timernum == 10) {
+        } else if (timernum == 9) {
             _ExtraBonusAirdrop = btimestamp;
-        } else if (timernum == 11) {
-            _ExtraBonusAirdropEnd = btimestamp;
-            //Test BuyBack
         }
 
         return true;

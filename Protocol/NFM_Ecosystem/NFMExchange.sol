@@ -1,3 +1,8 @@
+/**
+ *Submitted for verification at polygonscan.com on 2022-07-30
+ Polygon Mainnet: 0xcF8Cdffa25630Df98cBf762169bD69E9ED388Ac2
+ */
+
 //SPDX-License-Identifier:MIT
 pragma solidity ^0.8.13;
 
@@ -100,8 +105,6 @@ interface INfmController {
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 interface INfmOracle {
     function _getLatestPrice(address coin) external view returns (uint256);
-
-    function _addtoOracle(address Coin, uint256 Price) external returns (bool);
 }
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -450,9 +453,9 @@ contract NFMExchange {
     address private _USDC;
     address private _OracleAdr;
     address private _uniswapV2Router =
-        0xD99D1c33F9fC3444f8101754aBC46c52416550D1;
+        0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff;
     uint256 private _MinUSD = 10 * 10**18;
-    uint256 private _MaxUSD = 200000 * 10**18;
+    uint256 private _MaxUSD = 500000 * 10**18;
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     /*
     MAPPINGS
@@ -699,7 +702,7 @@ contract NFMExchange {
     This function is for inicialising or creating the uniswap pairs.
      */
     //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    function createPairUv2(address Coin) public returns (bool) {
+    function createPairUv2(address Coin) public onlyOwner returns (bool) {
         IUniswapV2Factory(IUniswapV2Router02(_uniswapV2Router).factory())
             .createPair(
                 address(_Controller._getNFM()),
