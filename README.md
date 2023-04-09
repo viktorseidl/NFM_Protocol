@@ -1,5 +1,7 @@
 # Main repo of crypto project NFTISMUS
 ## Bring your assets on a new level
+[![asciicast](https://nftismus.xyz/assets/iconnftismuscopy.c4f886b2.png)](https://nftismus.xyz/assets/logo.1be8a677.mp4)
+
 Nftismus is an all-encompassing concept that operates through the NFM token and the AFT Dao token on the Polygon-Network. Unlike any other NFT projects, we provide a revolutionary approach that paves a completely new path for NFTs. Our primary objective is to create a platform that enables NFTs to be listed, insured, and traded on exchanges.
 
 The valuation of NFTs is a crucial factor that determines their worth. Our platform ensures that the valuation of an NFT results in a securitizable and salable value, similar to company shares. Additionally, every asset linked to insurance makes it fail-safe and value-secured, adding an extra layer of protection to the asset. Moreover, this insurance asset is tradable, allowing users to engage in secure and profitable transactions.
