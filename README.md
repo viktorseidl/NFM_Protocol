@@ -20,7 +20,7 @@ This repository is divided into 7 directories, each containing a key function wi
 
 + The NextScale Project aims to offer an investment opportunity that is based on real values.
 
-##Official Page
+## Official Page
 
 + <a href="https://www.nftismus.xyz/">https://www.nftismus.xyz<a>
 + <a href="https://www.nftismus.io/">https://www.nftismus.io<a>
